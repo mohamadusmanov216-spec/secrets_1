@@ -9,8 +9,9 @@ import { z } from "zod";
 
 import { sharedPostgresStorage } from "./storage";
 import { inngest, inngestServe } from "./inngest";
-import { exampleWorkflow } from "./workflows/exampleWorkflow"; // Replace with your own workflow
-import { exampleAgent } from "./agents/exampleAgent"; // Replace with your own agent
+import { fitnessWorkflow } from "./workflows/fitnessWorkflow";
+import { fitnessAgent } from "./agents/fitnessAgent";
+import { registerTelegramTrigger } from "../triggers/telegramTriggers";
 
 class ProductionPinoLogger extends MastraLogger {
   protected logger: pino.Logger;
@@ -56,9 +57,9 @@ class ProductionPinoLogger extends MastraLogger {
 export const mastra = new Mastra({
   storage: sharedPostgresStorage,
   // Register your workflows here
-  workflows: {},
+  workflows: { fitnessWorkflow },
   // Register your agents here
-  agents: {},
+  agents: { fitnessAgent },
   mcpServers: {
     allTools: new MCPServer({
       name: "allTools",
@@ -115,99 +116,48 @@ export const mastra = new Mastra({
       // ======================================================================
       // Inngest Integration Endpoint
       // ======================================================================
-      // This API route is used to register the Mastra workflow (inngest function) on the inngest server
       {
         path: "/api/inngest",
         method: "ALL",
         createHandler: async ({ mastra }) => inngestServe({ mastra, inngest }),
-        // The inngestServe function integrates Mastra workflows with Inngest by:
-        // 1. Creating Inngest functions for each workflow with unique IDs (workflow.${workflowId})
-        // 2. Setting up event handlers that:
-        //    - Generate unique run IDs for each workflow execution
-        //    - Create an InngestExecutionEngine to manage step execution
-        //    - Handle workflow state persistence and real-time updates
-        // 3. Establishing a publish-subscribe system for real-time monitoring
-        //    through the workflow:${workflowId}:${runId} channel
       },
 
       // ======================================================================
       // Connector Webhook Triggers
       // ======================================================================
-      // Register your connector webhook handlers here using the spread operator.
-      // Each connector trigger should be defined in src/triggers/{connectorName}Triggers.ts
-      //
-      // PATTERN FOR ADDING A NEW CONNECTOR TRIGGER:
-      //
-      // 1. Create a trigger file: src/triggers/{connectorName}Triggers.ts
-      //    (See src/triggers/exampleConnectorTrigger.ts for a complete example)
-      //
-      // 2. Create a workflow: src/mastra/workflows/{connectorName}Workflow.ts
-      //    (See src/mastra/workflows/linearIssueWorkflow.ts for an example)
-      //
-      // 3. Import both in this file:
-      //    ```typescript
-      //    import { register{ConnectorName}Trigger } from "../triggers/{connectorName}Triggers";
-      //    import { {connectorName}Workflow } from "./workflows/{connectorName}Workflow";
-      //    ```
-      //
-      // 4. Register the trigger in the apiRoutes array below:
-      //    ```typescript
-      //    ...register{ConnectorName}Trigger({
-      //      triggerType: "{connector}/{event.type}",
-      //      handler: async (mastra, triggerInfo) => {
-      //        const logger = mastra.getLogger();
-      //        logger?.info("🎯 [{Connector} Trigger] Processing {event}", {
-      //          // Log relevant fields from triggerInfo.params
-      //        });
-      //
-      //        // Create a unique thread ID for this event
-      //        const threadId = `{connector}-{event}-${triggerInfo.params.someUniqueId}`;
-      //
-      //        // Start the workflow
-      //        const run = await {connectorName}Workflow.createRunAsync();
-      //        return await run.start({
-      //          inputData: {
-      //            threadId,
-      //            ...triggerInfo.params,
-      //          },
-      //        });
-      //      }
-      //    })
-      //    ```
-      //
-      // ======================================================================
-      // EXAMPLE: Linear Issue Creation Webhook
-      // ======================================================================
-      // Uncomment to enable Linear webhook integration:
-      //
-      // ...registerLinearTrigger({
-      //   triggerType: "linear/issue.created",
-      //   handler: async (mastra, triggerInfo) => {
-      //     // Extract what you need from the full payload
-      //     const data = triggerInfo.payload?.data || {};
-      //     const title = data.title || "Untitled";
-      //
-      //     // Start your workflow
-      //     const run = await exampleWorkflow.createRunAsync();
-      //     return await run.start({
-      //       inputData: {
-      //         message: `Linear Issue: ${title}`,
-      //         includeAnalysis: true,
-      //       }
-      //     });
-      //   }
-      // }),
-      //
-      // To activate:
-      // 1. Uncomment the code above
-      // 2. Import at the top: import { registerLinearTrigger } from "../triggers/exampleConnectorTrigger";
-      //
-      // ======================================================================
-
       // Add more connector triggers below using the same pattern
       // ...registerGithubTrigger({ ... }),
       // ...registerSlackTrigger({ ... }),
       // ...registerStripeWebhook({ ... }),
+      
+      // Telegram Fitness Bot Trigger
+      ...registerTelegramTrigger({
+        triggerType: "telegram/message",
+        handler: async (mastra, triggerInfo) => {
+          const logger = mastra.getLogger();
+          logger?.info("🎯 [Telegram Trigger] Processing message", {
+            userName: triggerInfo.params.userName,
+            chatId: triggerInfo.params.chatId,
+            hasCallback: !!triggerInfo.params.callbackData,
+          });
+
+          // Create a unique thread ID for this conversation
+          const threadId = `telegram-fitness-${triggerInfo.params.chatId}`;
+
+          // Start the fitness bot workflow
+          const run = await fitnessWorkflow.createRunAsync();
+          await run.start({
+            inputData: {
+              threadId,
+              chatId: triggerInfo.params.chatId,
+              messageId: triggerInfo.params.messageId,
+              messageText: triggerInfo.params.message,
+              callbackData: triggerInfo.params.callbackData,
+              userName: triggerInfo.params.userName,
+            },
+          });
+        },
+      }),
     ],
   },
   logger:
