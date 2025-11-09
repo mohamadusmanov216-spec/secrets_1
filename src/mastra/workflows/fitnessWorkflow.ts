@@ -1,6 +1,6 @@
 import { createStep, createWorkflow } from "../inngest";
 import { z } from "zod";
-import { fitnessAgent } from "../agents/fitnessAgent";
+import { telegramSendMessageTool, telegramEditMessageTool } from "../tools/telegramTool";
 
 /**
  * Fitness Bot Workflow
@@ -10,13 +10,99 @@ import { fitnessAgent } from "../agents/fitnessAgent";
  * responds with appropriate menu options and information.
  */
 
+// Text constants
+const MAIN_TEXT = `🏋️‍♂️ *Фитнес с Исламом*
+
+Сун хаъ хьо дик форме ва луъш вуй, йиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО
+
+✅ *Х1окх чохь хир бол пайд:*
+1. Мышечный масс набрать мух я ез.
+2. Вес скинуть мух я ез.
+3. Спорт питание муьлхаг лело ез. 
+4. Фармакологих лаьцна. 
+
+💪 Вай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ.`;
+
+const NUTRITION_TEXT = `🥗 *Про спорт питание*
+
+Х1окх видео хьаьжа бе тренировкш, спорт питание йол ма елахь 🙌🏼
+
+📞 *Контакты:*
+Wa.me/79222220217
+
+💎 Напиши «Коуч» и я дам тебе 20% скидку`;
+
+const COACHING_TEXT = `💪 *Под ключ с Исламом*
+
+Хьа тренировочный процесс юкъ со включить х1унда ва вез х1аж эц видео т1ехь.
+
+📞 *Контакты:*
+Wa.me/79222220217
+
+💎 Напиши «Коуч» и я дам тебе 20% скидку`;
+
+const APPLICATION_TEXT = `📝 *Оставить заявку*
+
+Чтобы оставить заявку, напиши мне в WhatsApp сообщение:
+
+Заявка от бота: [Имя] [Возраст] [Опыт тренировок]
+
+📋 *Пример:*
+«Заявка от бота: Ахмад 21 2 года»
+
+✅ Я свяжусь с тобой в ближайшее время!`;
+
+// Keyboard layouts
+const MAIN_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: '🥗 Про спорт питание', callback_data: 'nutrition' },
+      { text: '💪 Под ключ с Исламом', callback_data: 'coaching' }
+    ],
+    [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }]
+  ]
+};
+
+const NUTRITION_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: '💪 Тренировки', callback_data: 'coaching' },
+      { text: '📝 Оставить заявку', callback_data: 'application' }
+    ],
+    [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }],
+    [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+  ]
+};
+
+const COACHING_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: '🥗 Питание', callback_data: 'nutrition' },
+      { text: '📝 Оставить заявку', callback_data: 'application' }
+    ],
+    [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }],
+    [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+  ]
+};
+
+const APPLICATION_KEYBOARD = {
+  inline_keyboard: [
+    [{ text: '📱 Написать в WhatsApp', url: 'https://wa.me/79222220217' }],
+    [
+      { text: '🥗 Питание', callback_data: 'nutrition' },
+      { text: '💪 Тренировки', callback_data: 'coaching' }
+    ],
+    [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+  ]
+};
+
 /**
  * Step 1: Process Telegram Message or Callback
  * This step handles both regular messages and callback button presses
  */
 const processTelegramMessage = createStep({
   id: "process-telegram-message",
-  description: "Process incoming Telegram message or callback query using the fitness bot agent",
+  description: "Process incoming Telegram message or callback query and respond with appropriate menu",
 
   inputSchema: z.object({
     threadId: z.string().describe("Unique thread ID for this conversation"),
@@ -29,8 +115,8 @@ const processTelegramMessage = createStep({
 
   outputSchema: z.object({
     success: z.boolean(),
-    response: z.string(),
-    actionTaken: z.string(),
+    action: z.string(),
+    messageType: z.enum(["sent", "edited", "help"]),
   }),
 
   execute: async ({ inputData, mastra }) => {
@@ -41,61 +127,91 @@ const processTelegramMessage = createStep({
       callbackData: inputData.callbackData,
     });
 
-    let prompt = "";
+    let result;
 
-    // Determine the action based on message text or callback data
+    // Handle /start command
     if (inputData.messageText === "/start") {
-      prompt = `
-        A user just started the bot with the /start command.
-        Chat ID: ${inputData.chatId}
-        
-        Please send the main menu message using the telegram-send-message tool.
-        Use the MAIN_TEXT template with the appropriate inline keyboard buttons.
-      `;
-    } else if (inputData.callbackData) {
-      // Handle callback query (button press)
+      logger?.info("📤 [Step 1] Sending main menu");
+      result = await telegramSendMessageTool.execute({
+        context: {
+          chat_id: inputData.chatId,
+          text: MAIN_TEXT,
+          parse_mode: "Markdown",
+          reply_markup: MAIN_KEYBOARD,
+        },
+        runtimeContext: {},
+        mastra,
+      });
+      
+      return {
+        success: result.success,
+        action: "main_menu_sent",
+        messageType: "sent",
+      };
+    }
+    
+    // Handle callback queries (button presses)
+    if (inputData.callbackData && inputData.messageId) {
       const action = inputData.callbackData;
-      prompt = `
-        A user pressed a button with callback data: "${action}"
-        Chat ID: ${inputData.chatId}
-        Message ID to edit: ${inputData.messageId}
-        
-        Please edit the message using the telegram-edit-message tool.
-        Based on the callback data "${action}", show the appropriate page:
-        - "nutrition" -> NUTRITION_TEXT with nutrition buttons
-        - "coaching" -> COACHING_TEXT with coaching buttons
-        - "application" -> APPLICATION_TEXT with application buttons
-        - "main_menu" -> MAIN_TEXT with main menu buttons
-      `;
-    } else {
-      // Handle regular message (not /start)
-      prompt = `
-        A user sent a message: "${inputData.messageText}"
-        Chat ID: ${inputData.chatId}
-        
-        Please respond helpfully about fitness coaching services and suggest using the /start command
-        to see the menu if they seem interested in the services.
-      `;
+      logger?.info("📝 [Step 1] Handling callback:", { action });
+
+      let text = MAIN_TEXT;
+      let keyboard = MAIN_KEYBOARD;
+
+      switch (action) {
+        case 'nutrition':
+          text = NUTRITION_TEXT;
+          keyboard = NUTRITION_KEYBOARD;
+          break;
+        case 'coaching':
+          text = COACHING_TEXT;
+          keyboard = COACHING_KEYBOARD;
+          break;
+        case 'application':
+          text = APPLICATION_TEXT;
+          keyboard = APPLICATION_KEYBOARD;
+          break;
+        case 'main_menu':
+          text = MAIN_TEXT;
+          keyboard = MAIN_KEYBOARD;
+          break;
+      }
+
+      result = await telegramEditMessageTool.execute({
+        context: {
+          chat_id: inputData.chatId,
+          message_id: inputData.messageId,
+          text: text,
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        },
+        runtimeContext: {},
+        mastra,
+      });
+
+      return {
+        success: result.success,
+        action: `menu_${action}`,
+        messageType: "edited",
+      };
     }
 
-    logger?.info("📝 [Step 1] Calling fitness agent with prompt");
-
-    // Call the agent using generateLegacy for SDK v4 compatibility
-    const response = await fitnessAgent.generateLegacy(
-      [{ role: "user", content: prompt }],
-      {
-        resourceId: "fitness-bot",
-        threadId: inputData.threadId,
-        maxSteps: 5,
-      }
-    );
-
-    logger?.info("✅ [Step 1] Agent processing complete");
+    // Handle other messages
+    logger?.info("💬 [Step 1] Sending help message");
+    result = await telegramSendMessageTool.execute({
+      context: {
+        chat_id: inputData.chatId,
+        text: "Привет! 👋 Используй команду /start чтобы увидеть меню.",
+        parse_mode: "Markdown",
+      },
+      runtimeContext: {},
+      mastra,
+    });
 
     return {
-      success: true,
-      response: response.text,
-      actionTaken: inputData.callbackData || inputData.messageText || "unknown",
+      success: result.success,
+      action: "help_sent",
+      messageType: "help",
     };
   },
 });
@@ -110,8 +226,8 @@ const logResults = createStep({
 
   inputSchema: z.object({
     success: z.boolean(),
-    response: z.string(),
-    actionTaken: z.string(),
+    action: z.string(),
+    messageType: z.enum(["sent", "edited", "help"]),
   }),
 
   outputSchema: z.object({
@@ -129,10 +245,8 @@ const logResults = createStep({
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ Success: ${inputData.success}
-🎯 Action: ${inputData.actionTaken}
-
-🤖 Agent Response:
-${inputData.response}
+🎯 Action: ${inputData.action}
+📨 Message Type: ${inputData.messageType}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
@@ -142,7 +256,7 @@ ${inputData.response}
 
     return {
       completed: true,
-      summary: `Fitness bot handled action: ${inputData.actionTaken}`,
+      summary: `Fitness bot handled action: ${inputData.action}`,
     };
   },
 });

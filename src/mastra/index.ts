@@ -10,7 +10,6 @@ import { z } from "zod";
 import { sharedPostgresStorage } from "./storage";
 import { inngest, inngestServe } from "./inngest";
 import { fitnessWorkflow } from "./workflows/fitnessWorkflow";
-import { fitnessAgent } from "./agents/fitnessAgent";
 import { registerTelegramTrigger } from "../triggers/telegramTriggers";
 
 class ProductionPinoLogger extends MastraLogger {
@@ -59,7 +58,7 @@ export const mastra = new Mastra({
   // Register your workflows here
   workflows: { fitnessWorkflow },
   // Register your agents here
-  agents: { fitnessAgent },
+  agents: {},
   mcpServers: {
     allTools: new MCPServer({
       name: "allTools",
