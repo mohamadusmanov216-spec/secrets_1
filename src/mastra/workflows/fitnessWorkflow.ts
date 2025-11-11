@@ -221,6 +221,9 @@ const processTelegramMessage = createStep({
                 inline_keyboard: [
                   [
                     { text: 'Под ключ с Исламом', callback_data: 'coaching_video' }
+                  ],
+                  [
+                    { text: 'Оставить заявку', callback_data: 'start_application' }
                   ]
                 ]
               },
@@ -239,10 +242,10 @@ const processTelegramMessage = createStep({
               reply_markup: {
                 inline_keyboard: [
                   [
-                    { text: 'Оставить заявку', callback_data: 'start_application' }
+                    { text: 'Про спорт питание', callback_data: 'nutrition_video' }
                   ],
                   [
-                    { text: 'Про спорт питание', callback_data: 'nutrition_video' }
+                    { text: 'Оставить заявку', callback_data: 'start_application' }
                   ]
                 ]
               },
