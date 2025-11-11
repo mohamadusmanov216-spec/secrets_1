@@ -119,7 +119,7 @@ const processTelegramMessage = createStep({
     messageType: z.enum(["sent", "edited", "help"]),
   }),
 
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, runtimeContext }) => {
     const logger = mastra?.getLogger();
     logger?.info("🚀 [Step 1] Processing Telegram message/callback...", {
       chatId: inputData.chatId,
@@ -139,8 +139,7 @@ const processTelegramMessage = createStep({
           parse_mode: "Markdown",
           reply_markup: MAIN_KEYBOARD,
         },
-        runtimeContext: {},
-        mastra,
+        runtimeContext,
       });
       
       return {
@@ -185,8 +184,7 @@ const processTelegramMessage = createStep({
           parse_mode: "Markdown",
           reply_markup: keyboard,
         },
-        runtimeContext: {},
-        mastra,
+        runtimeContext,
       });
 
       return {
@@ -204,8 +202,7 @@ const processTelegramMessage = createStep({
         text: "Привет! 👋 Используй команду /start чтобы увидеть меню.",
         parse_mode: "Markdown",
       },
-      runtimeContext: {},
-      mastra,
+      runtimeContext,
     });
 
     return {

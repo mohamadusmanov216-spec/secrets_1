@@ -54,7 +54,8 @@ class ProductionPinoLogger extends MastraLogger {
 }
 
 export const mastra = new Mastra({
-  storage: sharedPostgresStorage,
+  // Storage disabled - not needed for simple menu bot
+  // storage: sharedPostgresStorage,
   // Register your workflows here
   workflows: { fitnessWorkflow },
   // Register your agents here
