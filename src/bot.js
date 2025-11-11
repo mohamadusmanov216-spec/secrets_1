@@ -1,44 +1,140 @@
 const { Mastra } = require('@mastra/core');
-const { TelegramTool } = require('@mastra/telegram');
 
 const fitnessBot = Mastra.agent({
   name: 'fitness-bot',
-  tools: [TelegramTool],
   async execute({ context, tools }) {
     const telegram = tools.telegram;
+    const payload = context.payload;
 
-    // Текстовые константы
-    const MAIN_TEXT = `🏋️‍♂️ *Фитнес с Исламом*
+    // Тексты для видео-разделов
+    const NUTRITION_VIDEO_TEXT = `🥗 *Видео про спорт питание*
 
-Сун хаъ хьо дик форме ва луъш вуй, йиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО
+📹 Смотрите как правильно питаться:
 
-✅ *Х1окх чохь хир бол пайд:*
-1. Мышечный масс набрать мух я ез.
-2. Вес скинуть мух я ез.
-3. Спорт питание муьлхаг лело ез. 
-4. Фармакологих лаьцна. 
+💪 *После просмотра:*
+- Узнаете основы спортивного питания
+- Поймете как сочетать продукты
+- Научитесь планировать рацион
 
-💪 Вай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ.`;
+📞 *Для персональной программы:*
+Wa.me/79222220217`;
 
-    const NUTRITION_TEXT = `🥗 *Про спорт питание*
+    const COACHING_VIDEO_TEXT = `💪 *Видео про тренировки*
 
-Х1окх видео хьаьжа бе тренировкш, спорт питание йол ма елахь 🙌🏼
+📹 Смотрите технику упражнений:
 
-📞 *Контакты:*
-Wa.me/79222220217
+🏋️ *После просмотра:*
+- Освоите правильную технику
+- Узнаете про программу тренировок
+- Поймете как прогрессировать
 
-💎 Напиши «Коуч» и я дам тебе 20% скидку`;
+📞 *Для тренировок под ключ:*
+Wa.me/79222220217`;
 
-    const COACHING_TEXT = `💪 *Под ключ с Исламом*
+    // Обработка команды /start
+    if (payload.message?.text === '/start') {
+      try {
+        // Сначала отправляем фото
+        await telegram.sendPhoto({
+          chat_id: payload.message.chat.id,
+          photo: 'https://share.icloud.com/photos/035d4WW89u0KI4SRw86y0a1ZA',
+          caption: `🏋️‍♂️ *Фитнес с Исламом*\n\nСун хаъ хьо дик форме ва луъш вуй! 💪`,
+          parse_mode: 'Markdown'
+        });
+      } catch (error) {
+        // Если фото не работает, отправляем только текст
+        await telegram.sendMessage({
+          chat_id: payload.message.chat.id,
+          text: `🏋️‍♂️ *Фитнес с Исламом*\n\nСун хаъ хьо дик форме ва луъш вуй! 💪`,
+          parse_mode: 'Markdown'
+        });
+      }
 
-Хьа тренировочный процесс юкъ со включить х1унда ва вез х1аж эц видео т1ехь.
+      // Затем отправляем кнопки
+      await telegram.sendMessage({
+        chat_id: payload.message.chat.id,
+        text: "Выберите что вас интересует:",
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🥗 Спорт питание', callback_data: 'nutrition_video' },
+              { text: '💪 Тренировки', callback_data: 'coaching_video' }
+            ]
+          ]
+        }
+      });
+      return;
+    }
 
-📞 *Контакты:*
-Wa.me/79222220217
+    // Обработка callback кнопок
+    if (payload.callback_query?.data) {
+      const chatId = payload.callback_query.message?.chat.id;
+      const messageId = payload.callback_query.message?.message_id;
 
-💎 Напиши «Коуч» и я дам тебе 20% скидку`;
+      if (!chatId || !messageId) return;
 
-    const APPLICATION_TEXT = `📝 *Оставить заявку*
+      switch (payload.callback_query.data) {
+        // 🥗 ПИТАНИЕ - видео
+        case 'nutrition_video':
+          await telegram.editMessageText({
+            chat_id: chatId,
+            message_id: messageId,
+            text: NUTRITION_VIDEO_TEXT,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { 
+                    text: '📹 СМОТРЕТЬ ВИДЕО ПИТАНИЯ', 
+                    url: 'https://youtube.com/ВАШЕ_ВИДЕО_ПИТАНИЯ'
+                  }
+                ],
+                [
+                  { text: '💪 Хочу тренировки', callback_data: 'coaching_video' }
+                ],
+                [
+                  { text: '📝 Оставить заявку', callback_data: 'application' },
+                  { text: '🏠 Главное меню', callback_data: 'main_menu' }
+                ]
+              ]
+            }
+          });
+          break;
+
+        // 💪 ТРЕНИРОВКИ - видео
+        case 'coaching_video':
+          await telegram.editMessageText({
+            chat_id: chatId,
+            message_id: messageId,
+            text: COACHING_VIDEO_TEXT,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { 
+                    text: '📹 СМОТРЕТЬ ВИДЕО ТРЕНИРОВКИ', 
+                    url: 'https://youtube.com/ВАШЕ_ВИДЕО_ТРЕНИРОВКИ'
+                  }
+                ],
+                [
+                  { text: '🥗 Хочу про питание', callback_data: 'nutrition_video' }
+                ],
+                [
+                  { text: '📝 Оставить заявку', callback_data: 'application' },
+                  { text: '🏠 Главное меню', callback_data: 'main_menu' }
+                ]
+              ]
+            }
+          });
+          break;
+
+        // 📝 ЗАЯВКА
+        case 'application':
+          await telegram.editMessageText({
+            chat_id: chatId,
+            message_id: messageId,
+            text: `📝 *Оставить заявку*
 
 Чтобы оставить заявку, напиши мне в WhatsApp сообщение:
 
@@ -47,104 +143,52 @@ Wa.me/79222220217
 📋 *Пример:*
 «Заявка от бота: Ахмад 21 2 года»
 
-✅ Я свяжусь с тобой в ближайшее время!`;
-
-    // Обработка команды /start
-    if (context.message?.text === '/start') {
-      await telegram.sendMessage({
-        chat_id: context.message.chat.id,
-        text: MAIN_TEXT,
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '🥗 Про спорт питание', callback_data: 'nutrition' },
-              { text: '💪 Под ключ с Исламом', callback_data: 'coaching' }
-            ],
-            [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }]
-          ]
-        }
-      });
-    }
-
-    // Обработка callback кнопок
-    if (context.callback_query) {
-      const chatId = context.callback_query.message?.chat.id;
-      const messageId = context.callback_query.message?.message_id;
-
-      if (!chatId || !messageId) return;
-
-      switch (context.callback_query.data) {
-        case 'nutrition':
-          await telegram.editMessageText({
-            chat_id: chatId,
-            message_id: messageId,
-            text: NUTRITION_TEXT,
+✅ Я свяжусь с тобой в ближайшее время!`,
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '💪 Тренировки', callback_data: 'coaching' },
-                  { text: '📝 Оставить заявку', callback_data: 'application' }
+                  { text: '📱 Написать в WhatsApp', url: 'https://wa.me/79222220217' }
                 ],
-                [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }],
-                [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+                [
+                  { text: '🥗 Питание', callback_data: 'nutrition_video' },
+                  { text: '💪 Тренировки', callback_data: 'coaching_video' }
+                ],
+                [
+                  { text: '🏠 Главное меню', callback_data: 'main_menu' }
+                ]
               ]
             }
           });
           break;
 
-        case 'coaching':
-          await telegram.editMessageText({
-            chat_id: chatId,
-            message_id: messageId,
-            text: COACHING_TEXT,
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: '🥗 Питание', callback_data: 'nutrition' },
-                  { text: '📝 Оставить заявку', callback_data: 'application' }
-                ],
-                [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }],
-                [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-              ]
-            }
-          });
-          break;
-
-        case 'application':
-          await telegram.editMessageText({
-            chat_id: chatId,
-            message_id: messageId,
-            text: APPLICATION_TEXT,
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: '📱 Написать в WhatsApp', url: 'https://wa.me/79222220217' }],
-                [
-                  { text: '🥗 Питание', callback_data: 'nutrition' },
-                  { text: '💪 Тренировки', callback_data: 'coaching' }
-                ],
-                [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-              ]
-            }
-          });
-          break;
-
+        // 🏠 ГЛАВНОЕ МЕНЮ
         case 'main_menu':
-          await telegram.editMessageText({
+          try {
+            await telegram.sendPhoto({
+              chat_id: chatId,
+              photo: 'https://share.icloud.com/photos/035d4WW89u0KI4SRw86y0a1ZA',
+              caption: `🏋️‍♂️ *Фитнес с Исламом*\n\nСун хаъ хьо дик форме ва луъш вуй! 💪`,
+              parse_mode: 'Markdown'
+            });
+          } catch (error) {
+            await telegram.sendMessage({
+              chat_id: chatId,
+              text: `🏋️‍♂️ *Фитнес с Исламом*\n\nСун хаъ хьо дик форме ва луъш вуй! 💪`,
+              parse_mode: 'Markdown'
+            });
+          }
+
+          await telegram.sendMessage({
             chat_id: chatId,
-            message_id: messageId,
-            text: MAIN_TEXT,
+            text: "Выберите что вас интересует:",
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '🥗 Про спорт питание', callback_data: 'nutrition' },
-                  { text: '💪 Под ключ с Исламом', callback_data: 'coaching' }
-                ],
-                [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }]
+                  { text: '🥗 Спорт питание', callback_data: 'nutrition_video' },
+                  { text: '💪 Тренировки', callback_data: 'coaching_video' }
+                ]
               ]
             }
           });
