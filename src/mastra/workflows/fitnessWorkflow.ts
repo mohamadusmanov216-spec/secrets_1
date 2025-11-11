@@ -1,283 +1,293 @@
-import { createStep, createWorkflow } from "../inngest";
-import { z } from "zod";
-import { telegramSendMessageTool, telegramEditMessageTool } from "../tools/telegramTool";
+import { Mastra } from "@mastra/core";
 
-/**
- * Fitness Bot Workflow
- *
- * This workflow handles incoming Telegram messages and callback queries
- * for the fitness coaching bot. It processes user interactions and
- * responds with appropriate menu options and information.
- */
+export const fitnessWorkflow = Mastra.workflow({
+  id: "fitness-bot",
+  name: "Fitness Bot Workflow", 
+  async execute({ mastra, step, context }) {
+    const { chatId, messageText, callbackData, messageId, userName } = context.inputData;
 
-// Text constants
-const MAIN_TEXT = `🏋️‍♂️ *Фитнес с Исламом*
+    const telegram = mastra.getTool('telegram');
+    const ADMIN_ID = "1061591635"; // Твой ID для заявок
 
-Сун хаъ хьо дик форме ва луъш вуй, йиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО
+    // Хранилище для анкет (в памяти)
+    const userApplications = new Map();
 
-✅ *Х1окх чохь хир бол пайд:*
-1. Мышечный масс набрать мух я ез.
-2. Вес скинуть мух я ез.
-3. Спорт питание муьлхаг лело ез. 
-4. Фармакологих лаьцна. 
+    // Тексты как в старом боте
+    const NUTRITION_VIDEO_TEXT = `🥗 *СПОРТИВНОЕ ПИТАНИЕ*
 
-💪 Вай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ.`;
+📹 Смотрите как правильно питаться:
 
-const NUTRITION_TEXT = `🥗 *Про спорт питание*
+💪 *После просмотра:*
+- Узнаете основы спортивного питания
+- Поймете как сочетать продукты
+- Научитесь планировать рацион
 
-Х1окх видео хьаьжа бе тренировкш, спорт питание йол ма елахь 🙌🏼
-
-📞 *Контакты:*
+📞 *Для персональной программы:*
 Wa.me/79222220217
+*Напиши «Коуч» и получи 20% СКИДКУ!*`;
 
-💎 Напиши «Коуч» и я дам тебе 20% скидку`;
+    const COACHING_VIDEO_TEXT = `💪 *ПОД КЛЮЧ С ИСЛАМОМ*
 
-const COACHING_TEXT = `💪 *Под ключ с Исламом*
+📹 Смотрите технику упражнений:
 
-Хьа тренировочный процесс юкъ со включить х1унда ва вез х1аж эц видео т1ехь.
+🏋️ *После просмотра:*
+- Освоите правильную технику
+- Узнаете про программу тренировок  
+- Поймете как прогрессировать
 
-📞 *Контакты:*
+📞 *Для тренировок под ключ:*
 Wa.me/79222220217
+*Напиши «Коуч» и получи 20% СКИДКУ!*`;
 
-💎 Напиши «Коуч» и я дам тебе 20% скидку`;
+    // Функция отправки заявки админу
+    async function sendApplicationToAdmin(userApp, userInfo) {
+      const applicationText = `🎯 *НОВАЯ ЗАЯВКА НА ТРЕНИРОВКИ*
 
-const APPLICATION_TEXT = `📝 *Оставить заявку*
+👤 *Основная информация:*
+• Имя и возраст: ${userApp.answers.nameAge || 'Не указано'}
+• Рост и вес: ${userApp.answers.heightWeight || 'Не указано'}
 
-Чтобы оставить заявку, напиши мне в WhatsApp сообщение:
+🏥 *Здоровье:*
+• Состояние: ${userApp.answers.health || 'Не указано'}
 
-Заявка от бота: [Имя] [Возраст] [Опыт тренировок]
+🎯 *Цели тренировок:*
+• Задачи: ${userApp.answers.goals || 'Не указано'}
 
-📋 *Пример:*
-«Заявка от бота: Ахмад 21 2 года»
+💊 *Фармакология:*
+• Планы: ${userApp.answers.plansPharmacology || 'Не указано'}
+• Текущая: ${userApp.answers.currentPharmacology || 'Не указано'}
 
-✅ Я свяжусь с тобой в ближайшее время!`;
+📱 *Контактные данные:*
+• От: @${userInfo.username || 'без username'}
+• ID: ${userInfo.id}
+• Время: ${new Date().toLocaleString('ru-RU')}`;
 
-// Keyboard layouts
-const MAIN_KEYBOARD = {
-  inline_keyboard: [
-    [
-      { text: '🥗 Про спорт питание', callback_data: 'nutrition' },
-      { text: '💪 Под ключ с Исламом', callback_data: 'coaching' }
-    ],
-    [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }]
-  ]
-};
-
-const NUTRITION_KEYBOARD = {
-  inline_keyboard: [
-    [
-      { text: '💪 Тренировки', callback_data: 'coaching' },
-      { text: '📝 Оставить заявку', callback_data: 'application' }
-    ],
-    [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }],
-    [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-  ]
-};
-
-const COACHING_KEYBOARD = {
-  inline_keyboard: [
-    [
-      { text: '🥗 Питание', callback_data: 'nutrition' },
-      { text: '📝 Оставить заявку', callback_data: 'application' }
-    ],
-    [{ text: '📞 Связаться', url: 'https://wa.me/79222220217' }],
-    [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-  ]
-};
-
-const APPLICATION_KEYBOARD = {
-  inline_keyboard: [
-    [{ text: '📱 Написать в WhatsApp', url: 'https://wa.me/79222220217' }],
-    [
-      { text: '🥗 Питание', callback_data: 'nutrition' },
-      { text: '💪 Тренировки', callback_data: 'coaching' }
-    ],
-    [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-  ]
-};
-
-/**
- * Step 1: Process Telegram Message or Callback
- * This step handles both regular messages and callback button presses
- */
-const processTelegramMessage = createStep({
-  id: "process-telegram-message",
-  description: "Process incoming Telegram message or callback query and respond with appropriate menu",
-
-  inputSchema: z.object({
-    threadId: z.string().describe("Unique thread ID for this conversation"),
-    chatId: z.union([z.string(), z.number()]).describe("Telegram chat ID"),
-    messageId: z.number().optional().describe("Message ID for editing (callback queries)"),
-    messageText: z.string().optional().describe("Text of the message (for regular messages)"),
-    callbackData: z.string().optional().describe("Callback data from button press"),
-    userName: z.string().optional().describe("Username of the sender"),
-  }),
-
-  outputSchema: z.object({
-    success: z.boolean(),
-    action: z.string(),
-    messageType: z.enum(["sent", "edited", "help"]),
-  }),
-
-  execute: async ({ inputData, mastra, runtimeContext }) => {
-    const logger = mastra?.getLogger();
-    logger?.info("🚀 [Step 1] Processing Telegram message/callback...", {
-      chatId: inputData.chatId,
-      messageText: inputData.messageText,
-      callbackData: inputData.callbackData,
-    });
-
-    let result;
-
-    // Handle /start command
-    if (inputData.messageText === "/start") {
-      logger?.info("📤 [Step 1] Sending main menu");
-      result = await telegramSendMessageTool.execute({
-        context: {
-          chat_id: inputData.chatId,
-          text: MAIN_TEXT,
-          parse_mode: "Markdown",
-          reply_markup: MAIN_KEYBOARD,
-        },
-        runtimeContext,
-      });
-      
-      return {
-        success: result.success,
-        action: "main_menu_sent",
-        messageType: "sent",
-      };
+      await telegram.sendMessage(ADMIN_ID, applicationText, { parse_mode: 'Markdown' });
     }
-    
-    // Handle callback queries (button presses)
-    if (inputData.callbackData && inputData.messageId) {
-      const action = inputData.callbackData;
-      logger?.info("📝 [Step 1] Handling callback:", { action });
 
-      let text = MAIN_TEXT;
-      let keyboard = MAIN_KEYBOARD;
-
-      switch (action) {
-        case 'nutrition':
-          text = NUTRITION_TEXT;
-          keyboard = NUTRITION_KEYBOARD;
-          break;
-        case 'coaching':
-          text = COACHING_TEXT;
-          keyboard = COACHING_KEYBOARD;
-          break;
-        case 'application':
-          text = APPLICATION_TEXT;
-          keyboard = APPLICATION_KEYBOARD;
-          break;
-        case 'main_menu':
-          text = MAIN_TEXT;
-          keyboard = MAIN_KEYBOARD;
-          break;
+    // Обработка /start
+    if (messageText === '/start') {
+      try {
+        await telegram.sendPhoto({
+          chat_id: chatId,
+          photo: 'https://photos.app.goo.gl/cnkR5c1rV8FBcvXu7',
+          caption: `🏋️‍♂️ *ФИТНЕС С ИСЛАМОМ*\n\nСун хаъ хьо дик форме ва луъш вуй!\n\nЙиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО\n\nПРЕИМУЩЕСТВА ТРЕНИРОВОК СО МНОЙ:\n\n• Мышечный масс набрать мух я ез\n• Вес скинуть мух я ез  \n• Спорт питание муьлхаг лело ез\n• Фармакологих лаьцна\n\nВай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ!`,
+          parse_mode: 'Markdown'
+        });
+      } catch (error) {
+        await telegram.sendMessage({
+          chat_id: chatId,
+          text: `🏋️‍♂️ *ФИТНЕС С ИСЛАМОМ*\n\nСун хаъ хьо дик форме ва луъш вуй!\n\nЙиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО\n\nПРЕИМУЩЕСТВА ТРЕНИРОВОК СО МНОЙ:\n\n• Мышечный масс набрать мух я ез\n• Вес скинуть мух я ез  \n• Спорт питание муьлхаг лело ез\n• Фармакологих лаьцна\n\nВай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ!`,
+          parse_mode: 'Markdown'
+        });
       }
 
-      result = await telegramEditMessageTool.execute({
-        context: {
-          chat_id: inputData.chatId,
-          message_id: inputData.messageId,
-          text: text,
-          parse_mode: "Markdown",
-          reply_markup: keyboard,
-        },
-        runtimeContext,
+      await telegram.sendMessage({
+        chat_id: chatId,
+        text: "ВЫБЕРИТЕ НАПРАВЛЕНИЕ:",
+        parse_mode: 'Markdown', 
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🥗 СПОРТИВНОЕ ПИТАНИЕ', callback_data: 'nutrition_video' },
+              { text: '💪 ПОД КЛЮЧ С ИСЛАМОМ', callback_data: 'coaching_video' }
+            ],
+            [
+              { text: '📝 ЗАПОЛНИТЬ АНКЕТУ', callback_data: 'start_application' }
+            ]
+          ]
+        }
       });
-
-      return {
-        success: result.success,
-        action: `menu_${action}`,
-        messageType: "edited",
-      };
+      return;
     }
 
-    // Handle other messages
-    logger?.info("💬 [Step 1] Sending help message");
-    result = await telegramSendMessageTool.execute({
-      context: {
-        chat_id: inputData.chatId,
-        text: "Привет! 👋 Используй команду /start чтобы увидеть меню.",
-        parse_mode: "Markdown",
-      },
-      runtimeContext,
-    });
+    // Обработка текстовых сообщений (ответы в анкете)
+    if (userApplications.has(chatId)) {
+      const userApp = userApplications.get(chatId);
+      const answer = messageText;
 
-    return {
-      success: result.success,
-      action: "help_sent",
-      messageType: "help",
-    };
-  },
+      // Сохраняем ответ и переходим к следующему вопросу
+      const questions = [
+        { text: `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 2/6:\n\nРост и вес?\n\n*Пример:* 180 см 75 кг` },
+        { text: `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 3/6:\n\nУ тебя есть заболевания, травмы, аллергии или перенесенные операции?\n\n*Если нет, напиши "Нет"*` },
+        { text: `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 4/6:\n\nУ тебя есть цели и задачи на тренировочный процесс?\n\n*Пример:* набор массы, скинуть вес, рельеф` },
+        { text: `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 5/6:\n\nПланируете ли использовать фармакологию, SARMS?\n\n*Да/Нет*` },
+        { text: `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 6/6:\n\nИспользуете ли вы фармакологию или SARMS сейчас? Если да, то какие препараты и дозировки?\n\n*Если нет, напиши "Нет"*` }
+      ];
+
+      const answerKeys = ['nameAge', 'heightWeight', 'health', 'goals', 'plansPharmacology', 'currentPharmacology'];
+
+      if (userApp.step <= 5) {
+        userApp.answers[answerKeys[userApp.step - 1]] = answer;
+        userApp.step++;
+
+        await telegram.sendMessage({
+          chat_id: chatId,
+          text: questions[userApp.step - 2].text,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '❌ Отменить заявку', callback_data: 'cancel_application' }
+              ]
+            ]
+          }
+        });
+
+      } else {
+        // Последний вопрос
+        userApp.answers.currentPharmacology = answer;
+
+        // Отправляем заявку админу
+        await sendApplicationToAdmin(userApp, {
+          id: chatId,
+          username: userName
+        });
+
+        // Удаляем анкету из хранилища
+        userApplications.delete(chatId);
+
+        await telegram.sendMessage({
+          chat_id: chatId,
+          text: `✅ *ЗАЯВКА ПРИНЯТА!*\n\nСпасибо за вашу заявку! Я свяжусь с вами в ближайшее время.\n\n💎 *БОНУС:* Напиши «Коуч» на Wa.me/79222220217 и получи 20% СКИДКУ!`,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🏠 Главное меню', callback_data: 'main_menu' }
+              ]
+            ]
+          }
+        });
+      }
+      return;
+    }
+
+    // Обработка кнопок
+    if (callbackData) {
+      switch (callbackData) {
+        case 'start_application':
+          // Начинаем анкету
+          userApplications.set(chatId, { step: 1, answers: {} });
+
+          await telegram.editMessageText({
+            chat_id: chatId,
+            message_id: messageId,
+            text: `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 1/6:\n\nВаше имя и возраст?\n\n*Пример:* Ахмад 21`,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '❌ Отменить заявку', callback_data: 'cancel_application' }
+                ]
+              ]
+            }
+          });
+          break;
+
+        case 'cancel_application':
+          userApplications.delete(chatId);
+          await telegram.editMessageText({
+            chat_id: chatId,
+            message_id: messageId,
+            text: `❌ *ЗАЯВКА ОТМЕНЕНА*\n\nВозвращайтесь, когда будете готовы начать тренировки!`,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🏠 Главное меню', callback_data: 'main_menu' }
+                ]
+              ]
+            }
+          });
+          break;
+
+        case 'nutrition_video':
+          await telegram.editMessageText({
+            chat_id: chatId,
+            message_id: messageId,
+            text: NUTRITION_VIDEO_TEXT,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '📹 СМОТРЕТЬ ВИДЕО ПИТАНИЯ',
+                    url: 'https://youtu.be/ct3l0gPaVQI?feature=shared'
+                  }
+                ],
+                [
+                  { text: '💪 ПОД КЛЮЧ С ИСЛАМОМ', callback_data: 'coaching_video' }
+                ],
+                [
+                  { text: '📝 Заполнить анкету', callback_data: 'start_application' },
+                  { text: '🏠 Главное меню', callback_data: 'main_menu' }
+                ]
+              ]
+            }
+          });
+          break;
+
+        case 'coaching_video':
+          await telegram.editMessageText({
+            chat_id: chatId,
+            message_id: messageId, 
+            text: COACHING_VIDEO_TEXT,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '📹 СМОТРЕТЬ ВИДЕО ТРЕНИРОВКИ', 
+                    url: 'https://youtu.be/Z38azV8aDzI?feature=shared'
+                  }
+                ],
+                [
+                  { text: '🥗 СПОРТИВНОЕ ПИТАНИЕ', callback_data: 'nutrition_video' }
+                ],
+                [
+                  { text: '📝 Заполнить анкету', callback_data: 'start_application' },
+                  { text: '🏠 Главное меню', callback_data: 'main_menu' }
+                ]
+              ]
+            }
+          });
+          break;
+
+        case 'main_menu':
+          try {
+            await telegram.sendPhoto({
+              chat_id: chatId,
+              photo: 'https://photos.app.goo.gl/cnkR5c1rV8FBcvXu7',
+              caption: `🏋️‍♂️ *ФИТНЕС С ИСЛАМОМ*\n\nСун хаъ хьо дик форме ва луъш вуй!\n\nЙиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО\n\nПРЕИМУЩЕСТВА ТРЕНИРОВОК СО МНОЙ:\n\n• Мышечный масс набрать мух я ез\n• Вес скинуть мух я ез  \n• Спорт питание муьлхаг лело ез\n• Фармакологих лаьцна\n\nВай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ!`,
+              parse_mode: 'Markdown'
+            });
+          } catch (error) {
+            await telegram.sendMessage({
+              chat_id: chatId,
+              text: `🏋️‍♂️ *ФИТНЕС С ИСЛАМОМ*\n\nСун хаъ хьо дик форме ва луъш вуй!\n\nЙиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО\n\nПРЕИМУЩЕСТВА ТРЕНИРОВОК СО МНОЙ:\n\n• Мышечный масс набрать мух я ез\n• Вес скинуть мух я ез  \n• Спорт питание муьлхаг лело ез\n• Фармакологих лаьцна\n\nВай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ!`,
+              parse_mode: 'Markdown'
+            });
+          }
+
+          await telegram.sendMessage({
+            chat_id: chatId,
+            text: "ВЫБЕРИТЕ НАПРАВЛЕНИЕ:",
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🥗 СПОРТИВНОЕ ПИТАНИЕ', callback_data: 'nutrition_video' },
+                  { text: '💪 ПОД КЛЮЧ С ИСЛАМОМ', callback_data: 'coaching_video' }
+                ],
+                [
+                  { text: '📝 ЗАПОЛНИТЬ АНКЕТУ', callback_data: 'start_application' }
+                ]
+              ]
+            }
+          });
+          break;
+      }
+    }
+  }
 });
-
-/**
- * Step 2: Log Results
- * This step logs the final results of the workflow
- */
-const logResults = createStep({
-  id: "log-results",
-  description: "Log the results of the fitness bot interaction",
-
-  inputSchema: z.object({
-    success: z.boolean(),
-    action: z.string(),
-    messageType: z.enum(["sent", "edited", "help"]),
-  }),
-
-  outputSchema: z.object({
-    completed: z.boolean(),
-    summary: z.string(),
-  }),
-
-  execute: async ({ inputData, mastra }) => {
-    const logger = mastra?.getLogger();
-    logger?.info("📤 [Step 2] Logging workflow results...");
-
-    const summary = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🏋️‍♂️ FITNESS BOT WORKFLOW RESULTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ Success: ${inputData.success}
-🎯 Action: ${inputData.action}
-📨 Message Type: ${inputData.messageType}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`;
-
-    logger?.info(summary);
-    logger?.info("✅ [Step 2] Workflow completed successfully");
-
-    return {
-      completed: true,
-      summary: `Fitness bot handled action: ${inputData.action}`,
-    };
-  },
-});
-
-/**
- * Create the fitness bot workflow by chaining steps
- */
-export const fitnessWorkflow = createWorkflow({
-  id: "fitness-bot-workflow",
-
-  inputSchema: z.object({
-    threadId: z.string().describe("Unique thread ID for this conversation"),
-    chatId: z.union([z.string(), z.number()]).describe("Telegram chat ID"),
-    messageId: z.number().optional().describe("Message ID for editing"),
-    messageText: z.string().optional().describe("Text of the message"),
-    callbackData: z.string().optional().describe("Callback data from button press"),
-    userName: z.string().optional().describe("Username of the sender"),
-  }) as any,
-
-  outputSchema: z.object({
-    completed: z.boolean(),
-    summary: z.string(),
-  }),
-})
-  .then(processTelegramMessage as any)
-  .then(logResults as any)
-  .commit();
