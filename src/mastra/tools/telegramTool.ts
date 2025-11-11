@@ -148,3 +148,59 @@ export const telegramEditMessageTool = createTool({
     }
   },
 });
+
+export const telegramAnswerCallbackQueryTool = createTool({
+  id: "telegram-answer-callback-query",
+  description: "Answer a callback query to remove loading state from button",
+  
+  inputSchema: z.object({
+    callback_query_id: z.string().describe("Callback query ID to answer"),
+    text: z.string().optional().describe("Optional notification text to show"),
+    show_alert: z.boolean().optional().describe("Show as alert instead of notification"),
+  }),
+
+  outputSchema: z.object({
+    success: z.boolean(),
+    error: z.string().optional(),
+  }),
+
+  execute: async ({ context, mastra }) => {
+    const logger = mastra?.getLogger();
+    logger?.info("🔧 [telegramAnswerCallbackQueryTool] Answering callback query");
+
+    try {
+      const response = await fetch(`${TELEGRAM_API_URL}/answerCallbackQuery`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          callback_query_id: context.callback_query_id,
+          text: context.text,
+          show_alert: context.show_alert || false,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        logger?.error("❌ [telegramAnswerCallbackQueryTool] Failed to answer callback:", data);
+        return {
+          success: false,
+          error: data.description || "Failed to answer callback query",
+        };
+      }
+
+      logger?.info("✅ [telegramAnswerCallbackQueryTool] Callback answered successfully");
+      return {
+        success: true,
+      };
+    } catch (error) {
+      logger?.error("❌ [telegramAnswerCallbackQueryTool] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});

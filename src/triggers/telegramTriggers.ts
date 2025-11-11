@@ -11,6 +11,7 @@ export type TriggerInfoTelegramOnNewMessage = {
     chatId: number | string;
     messageId?: number;
     callbackData?: string;
+    callbackQueryId?: string;
   };
   payload: any;
 };
@@ -52,6 +53,7 @@ export function registerTelegramTrigger({
                 chatId: payload.callback_query.message?.chat.id,
                 messageId: payload.callback_query.message?.message_id,
                 callbackData: payload.callback_query.data,
+                callbackQueryId: payload.callback_query.id,
               },
               payload,
             };

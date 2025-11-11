@@ -153,6 +153,7 @@ export const mastra = new Mastra({
               messageId: triggerInfo.params.messageId,
               messageText: triggerInfo.params.message,
               callbackData: triggerInfo.params.callbackData,
+              callbackQueryId: triggerInfo.params.callbackQueryId,
               userName: triggerInfo.params.userName,
             },
           });

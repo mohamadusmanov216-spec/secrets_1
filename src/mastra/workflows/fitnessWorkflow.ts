@@ -1,6 +1,6 @@
 import { createStep, createWorkflow } from "../inngest";
 import { z } from "zod";
-import { telegramSendMessageTool, telegramEditMessageTool } from "../tools/telegramTool";
+import { telegramSendMessageTool, telegramEditMessageTool, telegramAnswerCallbackQueryTool } from "../tools/telegramTool";
 
 const ADMIN_ID = "1061591635";
 
@@ -36,6 +36,7 @@ const processTelegramMessage = createStep({
     messageId: z.number().optional().describe("Message ID for editing"),
     messageText: z.string().optional().describe("Text of the message"),
     callbackData: z.string().optional().describe("Callback data from button press"),
+    callbackQueryId: z.string().optional().describe("Callback query ID for answering"),
     userName: z.string().optional().describe("Username of the sender"),
   }),
 
@@ -52,7 +53,7 @@ const processTelegramMessage = createStep({
       hasText: !!inputData.messageText,
     });
 
-    const { chatId, messageText, callbackData, messageId, userName } = inputData;
+    const { chatId, messageText, callbackData, messageId, userName, callbackQueryId } = inputData;
 
     if (messageText === "/start") {
       logger?.info("📤 [FitnessBot] Sending welcome message");
@@ -170,6 +171,15 @@ const processTelegramMessage = createStep({
 
     if (callbackData && messageId) {
       logger?.info("🔘 [FitnessBot] Processing callback", { callback: callbackData });
+
+      if (callbackQueryId) {
+        await telegramAnswerCallbackQueryTool.execute({
+          context: {
+            callback_query_id: callbackQueryId,
+          },
+          runtimeContext,
+        });
+      }
 
       switch (callbackData) {
         case 'start_application':
