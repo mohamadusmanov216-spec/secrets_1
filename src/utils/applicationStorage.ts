@@ -57,3 +57,11 @@ export function hasApplication(chatId: string): boolean {
   const storage = readStorage();
   return chatId in storage;
 }
+
+export function getAllApplications(): ApplicationStorage {
+  return readStorage();
+}
+
+export function clearAllApplications(): void {
+  writeStorage({});
+}

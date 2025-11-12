@@ -3,7 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { registerApiRoute } from "../mastra/inngest";
 import { Mastra } from "@mastra/core";
 import { telegramAnswerCallbackQueryTool, telegramEditMessageTool, telegramSendMessageTool } from "../mastra/tools/telegramTool";
-import { getApplication, setApplication, deleteApplication, hasApplication } from "../utils/applicationStorage";
+import { getApplication, setApplication, deleteApplication, hasApplication, getAllApplications, clearAllApplications } from "../utils/applicationStorage";
 
 const NUTRITION_VIDEO_TEXT = `💪 СПОРТ ПИТАНИЕ - хьан успех юкъ дала 🙌🏼
 
@@ -167,6 +167,75 @@ export function registerTelegramTrigger({
           } else if (payload.message) {
             const chatId = payload.message.chat.id;
             const messageText = payload.message.text || "";
+            
+            // Admin commands (only for admin ID: 1061591635)
+            const ADMIN_ID = 1061591635;
+            if (chatId === ADMIN_ID && (messageText === '/admin' || messageText === '/clear')) {
+              logger?.info("🔐 [Telegram] Admin command received", { command: messageText });
+              
+              if (messageText === '/admin') {
+                const allApps = getAllApplications();
+                const appCount = Object.keys(allApps).length;
+                
+                let responseText = `🔐 *АДМИН ПАНЕЛЬ*\n\n📊 Всего заявок: ${appCount}\n\n`;
+                
+                if (appCount === 0) {
+                  responseText += '❌ Нет заявок';
+                } else {
+                  responseText += '📝 *СПИСОК ЗАЯВОК:*\n\n';
+                  let counter = 1;
+                  
+                  for (const [chatId, app] of Object.entries(allApps)) {
+                    responseText += `${counter}. 👤 ID: \`${chatId}\`\n`;
+                    responseText += `   📅 Дата: ${new Date(app.createdAt).toLocaleString('ru-RU')}\n`;
+                    responseText += `   📊 Шаг: ${app.step}\n`;
+                    
+                    if (app.answers && Object.keys(app.answers).length > 0) {
+                      responseText += `   ✅ Ответы:\n`;
+                      if (app.answers.nameAge) responseText += `      • Имя/Возраст: ${app.answers.nameAge}\n`;
+                      if (app.answers.heightWeight) responseText += `      • Рост/Вес: ${app.answers.heightWeight}\n`;
+                      if (app.answers.health) responseText += `      • Здоровье: ${app.answers.health}\n`;
+                      if (app.answers.goals) responseText += `      • Цели: ${app.answers.goals}\n`;
+                      if (app.answers.plansPharmacology) responseText += `      • План фарма: ${app.answers.plansPharmacology}\n`;
+                      if (app.answers.currentPharmacology) responseText += `      • Текущий фарма: ${app.answers.currentPharmacology}\n`;
+                    }
+                    
+                    responseText += '\n';
+                    counter++;
+                  }
+                }
+                
+                telegramSendMessageTool.execute({
+                  context: {
+                    chat_id: chatId,
+                    text: responseText,
+                    parse_mode: "Markdown",
+                  },
+                  mastra,
+                  runtimeContext: {} as any,
+                }).catch((err) => logger?.error("❌ [Telegram] Failed to send admin response:", err));
+                
+                logger?.info("✅ [Telegram] Admin data sent");
+                return c.text("OK", 200);
+              }
+              
+              if (messageText === '/clear') {
+                clearAllApplications();
+                
+                telegramSendMessageTool.execute({
+                  context: {
+                    chat_id: chatId,
+                    text: `✅ *ДАННЫЕ ОЧИЩЕНЫ*\n\nВсе заявки удалены из базы данных.`,
+                    parse_mode: "Markdown",
+                  },
+                  mastra,
+                  runtimeContext: {} as any,
+                }).catch((err) => logger?.error("❌ [Telegram] Failed to send clear confirmation:", err));
+                
+                logger?.info("✅ [Telegram] All applications cleared");
+                return c.text("OK", 200);
+              }
+            }
             
             // Fast path: Handle application answers directly
             if (hasApplication(chatId.toString()) && messageText && messageText !== "/start") {
