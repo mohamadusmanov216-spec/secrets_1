@@ -4,7 +4,7 @@ import { telegramSendMessageTool, telegramEditMessageTool, telegramAnswerCallbac
 
 const ADMIN_ID = "1061591635";
 
-const NUTRITION_VIDEO_TEXT = `СПОРТ ПИТАНИЕ - хьан успех юкъ дала 🙌🏼
+const NUTRITION_VIDEO_TEXT = `💪 СПОРТ ПИТАНИЕ - хьан успех юкъ дала 🙌🏼
 
 Х1окх видео т1ехь хьаж бе:
 👇🏼 Массан набор т1е х1усам
@@ -12,27 +12,27 @@ const NUTRITION_VIDEO_TEXT = `СПОРТ ПИТАНИЕ - хьан успех ю
 👇🏼 Спорт питание мел сатуш
 👇🏼 Курсаш правильна лело
 
-БОНУС ХЬАН: 20% СКИДКА 🙌🏼
+🎁 БОНУС ХЬАН: 20% СКИДКА 🙌🏼
 
 Дехар до, язъе "Коуч" х1окх адрес т1е:
 Wa.me/79222220217
 
-Хаъ х1уна баха мел саттуш!`;
+Хаъ х1уна баха мел саттуш! 💯`;
 
-const COACHING_VIDEO_TEXT = `Хьа тренировочный процесс юкъ со включить х1унда ва вез хьаж эц видео т1ехь.
+const COACHING_VIDEO_TEXT = `🏆 Хьа тренировочный процесс юкъ со включить х1унда ва вез хьаж эц видео т1ехь.
 
-Wa.me/79222220217
-Напиши «Коуч» и я дам тебе 20% скидку.`;
+📲 Wa.me/79222220217
+Напиши «Коуч» и я дам тебе 20% скидку 🎁`;
 
-const MAIN_MENU_TEXT = `Сун хаъ хьо дик форме ва луъш вуй, йиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО
+const MAIN_MENU_TEXT = `💪 Сун хаъ хьо дик форме ва луъш вуй, йиаг ловш т1е йоьхаг товш волш хил везш ву НОХЧО
 
-Х1окх чохь хир бол пайд:👇🏼
-1. Мышечный масс набрать мух я ез.
-2. Вес скинуть мух я ез.
-3. Спорт питание муьлхаг лело ез.
-4. Фармакологих лаьцна.
+Х1окх чохь хир бол пайд: 👇🏼
+1️⃣ Мышечный масс набрать мух я ез
+2️⃣ Вес скинуть мух я ез
+3️⃣ Спорт питание муьлхаг лело ез
+4️⃣ Фармакологих лаьцна
 
-Вай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ.`;
+Вай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ 🙌🏼`;
 
 const userApplications = new Map();
 
@@ -66,25 +66,20 @@ const processTelegramMessage = createStep({
     const { chatId, messageText, callbackData, messageId, userName, callbackQueryId } = inputData;
 
     if (messageText === "/start") {
-      logger?.info("📤 [FitnessBot] Sending welcome message with photo");
+      logger?.info("📤 [FitnessBot] Sending welcome message");
       
-      const photoUrl = "https://files.catbox.moe/w2viji.jpg";
-      
-      logger?.info("📷 [FitnessBot] Using photo URL:", { photoUrl });
-      
-      const photoResult = await telegramSendPhotoTool.execute({
+      await telegramSendMessageTool.execute({
         context: {
           chat_id: chatId,
-          photo: photoUrl,
-          caption: MAIN_MENU_TEXT,
+          text: MAIN_MENU_TEXT,
           parse_mode: "Markdown",
           reply_markup: {
             inline_keyboard: [
               [
-                { text: 'Про спорт питание', callback_data: 'nutrition_video' }
+                { text: '💪 Про спорт питание', callback_data: 'nutrition_video' }
               ],
               [
-                { text: 'Под ключ с Исламом', callback_data: 'coaching_video' }
+                { text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }
               ]
             ]
           },
@@ -92,8 +87,6 @@ const processTelegramMessage = createStep({
         mastra,
         runtimeContext,
       });
-
-      logger?.info("📷 [FitnessBot] Photo send result:", photoResult);
 
       return { success: true, action: "start_sent" };
     }
@@ -248,10 +241,10 @@ const processTelegramMessage = createStep({
               reply_markup: {
                 inline_keyboard: [
                   [
-                    { text: 'Под ключ с Исламом', callback_data: 'coaching_video' }
+                    { text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }
                   ],
                   [
-                    { text: 'Оставить заявку', callback_data: 'start_application' }
+                    { text: '📝 Оставить заявку', callback_data: 'start_application' }
                   ]
                 ]
               },
@@ -270,10 +263,10 @@ const processTelegramMessage = createStep({
               reply_markup: {
                 inline_keyboard: [
                   [
-                    { text: 'Про спорт питание', callback_data: 'nutrition_video' }
+                    { text: '💪 Про спорт питание', callback_data: 'nutrition_video' }
                   ],
                   [
-                    { text: 'Оставить заявку', callback_data: 'start_application' }
+                    { text: '📝 Оставить заявку', callback_data: 'start_application' }
                   ]
                 ]
               },
@@ -292,7 +285,7 @@ const processTelegramMessage = createStep({
               reply_markup: {
                 inline_keyboard: [
                   [
-                    { text: 'Про спорт питание', callback_data: 'nutrition_video' }
+                    { text: '💪 Про спорт питание', callback_data: 'nutrition_video' }
                   ],
                   [
                     { text: 'Под ключ с Исламом', callback_data: 'coaching_video' }
