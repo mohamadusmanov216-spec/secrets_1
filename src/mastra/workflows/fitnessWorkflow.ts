@@ -320,17 +320,23 @@ const processTelegramMessage = createStep({
       return { success: true, action: `callback_${callbackData}` };
     }
 
-    logger?.info("💬 [FitnessBot] Sending help message");
+    logger?.info("💬 [FitnessBot] User sent text outside application - returning to main menu");
     await telegramSendMessageTool.execute({
       context: {
         chat_id: chatId,
-        text: "Привет! 👋 Используй команду /start чтобы увидеть меню.",
+        text: MAIN_MENU_TEXT,
         parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
+            [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }]
+          ]
+        },
       },
       runtimeContext,
     });
 
-    return { success: true, action: "help_sent" };
+    return { success: true, action: "menu_sent" };
   },
 });
 
