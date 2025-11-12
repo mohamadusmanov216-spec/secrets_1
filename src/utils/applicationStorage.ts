@@ -8,6 +8,7 @@ interface UserApplication {
   step: number;
   answers: Record<string, string>;
   createdAt: string;
+  messageIds?: number[];
 }
 
 interface ApplicationStorage {

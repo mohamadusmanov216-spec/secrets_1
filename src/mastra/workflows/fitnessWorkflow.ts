@@ -1,6 +1,6 @@
 import { createStep, createWorkflow } from "../inngest";
 import { z } from "zod";
-import { telegramSendMessageTool, telegramEditMessageTool, telegramAnswerCallbackQueryTool, telegramSendPhotoTool } from "../tools/telegramTool";
+import { telegramSendMessageTool, telegramEditMessageTool, telegramAnswerCallbackQueryTool, telegramSendPhotoTool, telegramDeleteMessageTool } from "../tools/telegramTool";
 import { getApplication, setApplication, deleteApplication, hasApplication } from "../../utils/applicationStorage";
 
 const ADMIN_ID = "1061591635";
@@ -120,13 +120,7 @@ const processTelegramMessage = createStep({
         userApp.answers[answerKeys[userApp.step - 1]] = answer;
         userApp.step++;
         
-        setApplication(chatId.toString(), {
-          step: userApp.step,
-          answers: userApp.answers,
-          createdAt: userApp.createdAt,
-        });
-
-        await telegramSendMessageTool.execute({
+        const result = await telegramSendMessageTool.execute({
           context: {
             chat_id: chatId,
             text: questions[userApp.step - 2],
@@ -138,6 +132,18 @@ const processTelegramMessage = createStep({
             },
           },
           runtimeContext,
+        });
+
+        const messageIds = userApp.messageIds || [];
+        if (result.message_id) {
+          messageIds.push(result.message_id);
+        }
+
+        setApplication(chatId.toString(), {
+          step: userApp.step,
+          answers: userApp.answers,
+          createdAt: userApp.createdAt,
+          messageIds: messageIds,
         });
 
       } else {
@@ -175,7 +181,7 @@ const processTelegramMessage = createStep({
           runtimeContext,
         });
 
-        deleteApplication(chatId.toString());
+        const messageIds = userApp.messageIds || [];
 
         await telegramSendMessageTool.execute({
           context: {
@@ -184,12 +190,22 @@ const processTelegramMessage = createStep({
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+                [{ text: '🏠 Главное меню', callback_data: 'main_menu' }],
+                [{ text: '🗑 Очистить чат', callback_data: 'clear_chat' }]
               ]
             },
           },
           runtimeContext,
         });
+
+        setApplication(chatId.toString(), {
+          step: 999,
+          answers: {},
+          createdAt: new Date().toISOString(),
+          messageIds: messageIds,
+        });
+        
+        logger?.info("💾 [FitnessBot] Saved message IDs for cleanup", { count: messageIds.length });
       }
 
       return { success: true, action: "application_processed" };
@@ -209,12 +225,6 @@ const processTelegramMessage = createStep({
 
       switch (callbackData) {
         case 'start_application':
-          setApplication(chatId.toString(), { 
-            step: 1, 
-            answers: {}, 
-            createdAt: new Date().toISOString() 
-          });
-
           await telegramEditMessageTool.execute({
             context: {
               chat_id: chatId,
@@ -229,6 +239,37 @@ const processTelegramMessage = createStep({
             },
             runtimeContext,
           });
+
+          setApplication(chatId.toString(), { 
+            step: 1, 
+            answers: {}, 
+            createdAt: new Date().toISOString(),
+            messageIds: [messageId],
+          });
+          break;
+
+        case 'clear_chat':
+          const userApp = getApplication(chatId.toString());
+          if (userApp && userApp.messageIds && userApp.messageIds.length > 0) {
+            logger?.info("🗑 [FitnessBot] Clearing chat messages", { count: userApp.messageIds.length });
+            
+            for (const msgId of userApp.messageIds) {
+              try {
+                await telegramDeleteMessageTool.execute({
+                  context: {
+                    chat_id: chatId,
+                    message_id: msgId,
+                  },
+                  runtimeContext,
+                });
+              } catch (error) {
+                logger?.warn("⚠️ [FitnessBot] Failed to delete message", { message_id: msgId });
+              }
+            }
+
+            deleteApplication(chatId.toString());
+            logger?.info("✅ [FitnessBot] Chat cleared successfully");
+          }
           break;
 
         case 'cancel_application':

@@ -268,3 +268,60 @@ export const telegramSendPhotoTool = createTool({
     }
   },
 });
+
+export const telegramDeleteMessageTool = createTool({
+  id: "telegram-delete-message",
+  description: "Delete a message from a Telegram chat",
+  
+  inputSchema: z.object({
+    chat_id: z.union([z.string(), z.number()]).describe("The chat ID"),
+    message_id: z.number().describe("The message ID to delete"),
+  }),
+
+  outputSchema: z.object({
+    success: z.boolean(),
+    error: z.string().optional(),
+  }),
+
+  execute: async ({ context, mastra }) => {
+    const logger = mastra?.getLogger();
+    logger?.info("🔧 [telegramDeleteMessageTool] Deleting message:", { 
+      chat_id: context.chat_id, 
+      message_id: context.message_id 
+    });
+
+    try {
+      const response = await fetch(`${TELEGRAM_API_URL}/deleteMessage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: context.chat_id,
+          message_id: context.message_id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        logger?.error("❌ [telegramDeleteMessageTool] Failed to delete message:", data);
+        return {
+          success: false,
+          error: data.description || "Failed to delete message",
+        };
+      }
+
+      logger?.info("✅ [telegramDeleteMessageTool] Message deleted successfully");
+      return {
+        success: true,
+      };
+    } catch (error) {
+      logger?.error("❌ [telegramDeleteMessageTool] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
