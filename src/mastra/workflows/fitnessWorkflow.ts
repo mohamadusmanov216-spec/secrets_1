@@ -75,10 +75,13 @@ const processTelegramMessage = createStep({
       
       logger?.info("📷 [FitnessBot] Using photo URL:", { photoUrl });
       
+      // Добавляем задержку для стабильности
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const photoResult = await telegramSendPhotoTool.execute({
         context: {
           chat_id: chatId,
-          photo_path: 'attached_assets/main_menu_photo.jpg',
+          photo: photoUrl,
           caption: MAIN_MENU_TEXT,
           parse_mode: "Markdown",
           reply_markup: {
