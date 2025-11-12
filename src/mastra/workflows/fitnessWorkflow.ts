@@ -75,7 +75,7 @@ const processTelegramMessage = createStep({
       
       logger?.info("📷 [FitnessBot] Using photo URL:", { photoUrl });
       
-      await telegramSendPhotoTool.execute({
+      const photoResult = await telegramSendPhotoTool.execute({
         context: {
           chat_id: chatId,
           photo: photoUrl,
@@ -92,8 +92,11 @@ const processTelegramMessage = createStep({
             ]
           },
         },
+        mastra,
         runtimeContext,
       });
+
+      logger?.info("📷 [FitnessBot] Photo send result:", photoResult);
 
       return { success: true, action: "start_sent" };
     }
