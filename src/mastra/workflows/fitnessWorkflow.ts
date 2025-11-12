@@ -78,7 +78,7 @@ const processTelegramMessage = createStep({
       const photoResult = await telegramSendPhotoTool.execute({
         context: {
           chat_id: chatId,
-          photo: photoUrl,
+          photo_path: 'attached_assets/main_menu_photo.jpg',
           caption: MAIN_MENU_TEXT,
           parse_mode: "Markdown",
           reply_markup: {

@@ -211,7 +211,8 @@ export const telegramSendPhotoTool = createTool({
   
   inputSchema: z.object({
     chat_id: z.union([z.string(), z.number()]).describe("The chat ID to send the photo to"),
-    photo: z.string().describe("Photo file_id or URL"),
+    photo_path: z.string().optional().describe("Local file path to photo (relative to project root)"),
+    photo_file_id: z.string().optional().describe("Telegram file_id for reusing uploaded photos"),
     caption: z.string().optional().describe("Photo caption"),
     parse_mode: z.enum(["Markdown", "HTML", "MarkdownV2"]).optional().describe("Parse mode for the caption"),
     reply_markup: inlineKeyboardMarkupSchema.optional().describe("Inline keyboard markup"),
@@ -229,18 +230,42 @@ export const telegramSendPhotoTool = createTool({
     logger?.info("🔧 [telegramSendPhotoTool] Sending photo to chat:", { chat_id: context.chat_id });
 
     try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+
+      const formData = new FormData();
+      formData.append('chat_id', String(context.chat_id));
+      
+      if (context.photo_file_id) {
+        // Use existing file_id (fastest method)
+        formData.append('photo', context.photo_file_id);
+      } else if (context.photo_path) {
+        // Upload new file
+        const photoPath = path.join(process.cwd(), context.photo_path);
+        const photoBuffer = await fs.readFile(photoPath);
+        const blob = new Blob([photoBuffer], { type: 'image/jpeg' });
+        formData.append('photo', blob, 'photo.jpg');
+      } else {
+        logger?.error("❌ [telegramSendPhotoTool] No photo source provided");
+        return {
+          success: false,
+          error: "Either photo_path or photo_file_id must be provided",
+        };
+      }
+
+      if (context.caption) {
+        formData.append('caption', context.caption);
+      }
+      if (context.parse_mode) {
+        formData.append('parse_mode', context.parse_mode);
+      }
+      if (context.reply_markup) {
+        formData.append('reply_markup', JSON.stringify(context.reply_markup));
+      }
+
       const response = await fetch(`${TELEGRAM_API_URL}/sendPhoto`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: context.chat_id,
-          photo: context.photo,
-          caption: context.caption,
-          parse_mode: context.parse_mode || "Markdown",
-          reply_markup: context.reply_markup,
-        }),
+        body: formData as any,
       });
 
       const data = await response.json();
@@ -254,10 +279,13 @@ export const telegramSendPhotoTool = createTool({
       }
 
       logger?.info("✅ [telegramSendPhotoTool] Photo sent successfully");
+      const fileId = data.result?.photo?.[data.result.photo.length - 1]?.file_id;
+      logger?.info("📸 [telegramSendPhotoTool] File ID for reuse:", { file_id: fileId });
+      
       return {
         success: true,
         message_id: data.result?.message_id,
-        file_id: data.result?.photo?.[0]?.file_id,
+        file_id: fileId,
       };
     } catch (error) {
       logger?.error("❌ [telegramSendPhotoTool] Error:", error);
