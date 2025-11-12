@@ -2,7 +2,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { registerApiRoute } from "../mastra/inngest";
 import { Mastra } from "@mastra/core";
-import { telegramAnswerCallbackQueryTool, telegramEditMessageTool } from "../mastra/tools/telegramTool";
+import { telegramAnswerCallbackQueryTool, telegramEditMessageTool, telegramSendMessageTool } from "../mastra/tools/telegramTool";
+import { getApplication, setApplication, deleteApplication, hasApplication } from "../utils/applicationStorage";
 
 const NUTRITION_VIDEO_TEXT = `💪 СПОРТ ПИТАНИЕ - хьан успех юкъ дала 🙌🏼
 
@@ -120,27 +121,27 @@ export function registerTelegramTrigger({
                   break;
               }
 
-              // Execute both API calls in parallel for speed
-              await Promise.all([
-                telegramAnswerCallbackQueryTool.execute({
-                  context: { callback_query_id: callbackQueryId },
-                  mastra,
-                  runtimeContext: {} as any,
-                }),
-                telegramEditMessageTool.execute({
-                  context: {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    text,
-                    parse_mode: "Markdown" as const,
-                    reply_markup: replyMarkup,
-                  },
-                  mastra,
-                  runtimeContext: {} as any,
-                }),
-              ]);
+              // Answer callback query immediately to remove loading indicator
+              telegramAnswerCallbackQueryTool.execute({
+                context: { callback_query_id: callbackQueryId },
+                mastra,
+                runtimeContext: {} as any,
+              }).catch((err) => logger?.error("❌ [Telegram] Failed to answer callback:", err));
 
-              logger?.info("✅ [Telegram] Fast-path completed");
+              // Edit message without waiting
+              telegramEditMessageTool.execute({
+                context: {
+                  chat_id: chatId,
+                  message_id: messageId,
+                  text,
+                  parse_mode: "Markdown" as const,
+                  reply_markup: replyMarkup,
+                },
+                mastra,
+                runtimeContext: {} as any,
+              }).catch((err) => logger?.error("❌ [Telegram] Failed to edit message:", err));
+
+              logger?.info("✅ [Telegram] Fast-path initiated");
               return c.text("OK", 200);
             }
 
@@ -158,6 +159,56 @@ export function registerTelegramTrigger({
               payload,
             };
           } else if (payload.message) {
+            const chatId = payload.message.chat.id;
+            const messageText = payload.message.text || "";
+            
+            // Fast path: Handle application answers directly
+            if (hasApplication(chatId.toString()) && messageText && messageText !== "/start") {
+              logger?.info("⚡ [Telegram] Fast-path application answer");
+              
+              const userApp = getApplication(chatId.toString());
+              if (userApp) {
+                const questions = [
+                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 2/6:\n\nРост и вес?\n\n*Пример:* 180 см 75 кг`,
+                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 3/6:\n\nУ тебя есть заболевания, травмы, аллергии или перенесенные операции?\n\n*Если нет, напиши "Нет"*`,
+                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 4/6:\n\nУ тебя есть цели и задачи на тренировочный процесс?\n\n*Пример:* набор массы, скинуть вес, рельеф`,
+                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 5/6:\n\nПланируете ли использовать фармакологию, SARMS?\n\n*Да/Нет*`,
+                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 6/6:\n\nИспользуете ли вы фармакологию или SARMS сейчас? Если да, то какие препараты и дозировки?\n\n*Если нет, напиши "Нет"*`
+                ];
+                
+                const answerKeys = ['nameAge', 'heightWeight', 'health', 'goals', 'plansPharmacology', 'currentPharmacology'];
+                
+                if (userApp.step <= 5) {
+                  userApp.answers[answerKeys[userApp.step - 1]] = messageText;
+                  userApp.step++;
+                  
+                  setApplication(chatId.toString(), {
+                    step: userApp.step,
+                    answers: userApp.answers,
+                    createdAt: userApp.createdAt,
+                  });
+                  
+                  telegramSendMessageTool.execute({
+                    context: {
+                      chat_id: chatId,
+                      text: questions[userApp.step - 2],
+                      parse_mode: "Markdown",
+                      reply_markup: {
+                        inline_keyboard: [
+                          [{ text: '❌ Отменить заявку', callback_data: 'cancel_application' }]
+                        ]
+                      },
+                    },
+                    mastra,
+                    runtimeContext: {} as any,
+                  }).catch((err) => logger?.error("❌ [Telegram] Failed to send question:", err));
+                  
+                  logger?.info("✅ [Telegram] Fast-path question sent");
+                  return c.text("OK", 200);
+                }
+              }
+            }
+            
             // Regular message
             triggerInfo = {
               type: "telegram/message",
