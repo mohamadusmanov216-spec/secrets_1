@@ -62,7 +62,9 @@ export function registerApiRoute<P extends string>(
         await step.run("forward request to Mastra", async () => {
           // It is hard to obtain an internal handle on the Hono server,
           // so we just forward the request to the local Mastra server.
-          const response = await fetch(`http://localhost:5000${path}`, {
+          // Add /api prefix if not already present
+          const apiPath = path.startsWith('/api/') ? path : `/api${path}`;
+          const response = await fetch(`http://localhost:5000${apiPath}`, {
             method: event.data.method,
             headers: event.data.headers,
             body: event.data.body,
