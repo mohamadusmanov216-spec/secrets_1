@@ -1,6 +1,11 @@
 {
   "dependencies": {
-    "@mastra/core": "^latest",
-    "@mastra/telegram": "^latest"
+    "@mastra/core": "^0.24.0",
+    "@mastra/inngest": "^0.18.4",
+    "@mastra/loggers": "^0.10.19",
+    "@mastra/mcp": "^0.14.2",
+    "@mastra/pg": "^0.17.8",
+    "inngest-cli": "^1.13.5",
+    "mastra": "^0.18.0"
   }
 }
