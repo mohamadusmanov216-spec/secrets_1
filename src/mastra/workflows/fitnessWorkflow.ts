@@ -68,15 +68,9 @@ const processTelegramMessage = createStep({
     if (messageText === "/start") {
       logger?.info("📤 [FitnessBot] Sending welcome message with photo");
       
-      // Get the photo URL from the current domain
-      const photoUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}/assets/main_menu_photo.jpg`
-        : `http://0.0.0.0:5000/assets/main_menu_photo.jpg`;
+      const photoUrl = "https://files.catbox.moe/w2viji.jpg";
       
       logger?.info("📷 [FitnessBot] Using photo URL:", { photoUrl });
-      
-      // Добавляем задержку для стабильности
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       const photoResult = await telegramSendPhotoTool.execute({
         context: {
