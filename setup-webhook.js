@@ -2,8 +2,21 @@ const https = require('https');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const REPLIT_DEV_DOMAIN = process.env.REPLIT_DEV_DOMAIN;
+const REPL_SLUG = process.env.REPL_SLUG;
+const REPL_OWNER = process.env.REPL_OWNER;
 
-const DEPLOYMENT_URL = `https://${REPLIT_DEV_DOMAIN}`;
+// Use custom URL from command line, or construct from environment
+const customUrl = process.argv[2];
+let DEPLOYMENT_URL;
+
+if (customUrl) {
+  DEPLOYMENT_URL = customUrl.startsWith('http') ? customUrl : `https://${customUrl}`;
+} else {
+  // Try to construct production URL first, fallback to dev
+  const prodDomain = `${REPL_SLUG}-${REPL_OWNER}.replit.app`;
+  DEPLOYMENT_URL = REPLIT_DEV_DOMAIN ? `https://${REPLIT_DEV_DOMAIN}` : `https://${prodDomain}`;
+}
+
 const WEBHOOK_PATH = '/webhooks/telegram/action';
 const WEBHOOK_URL = `${DEPLOYMENT_URL}${WEBHOOK_PATH}`;
 
