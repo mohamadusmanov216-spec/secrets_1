@@ -183,7 +183,7 @@ const processTelegramMessage = createStep({
 
         const messageIds = userApp.messageIds || [];
 
-        await telegramSendMessageTool.execute({
+        const confirmResult = await telegramSendMessageTool.execute({
           context: {
             chat_id: chatId,
             text: `✅ *ЗАЯВКА ПРИНЯТА!* 🎉\n\nСпасибо за вашу заявку! 🙏 Я свяжусь с вами в ближайшее время.\n\n💎 *БОНУС:* Напиши «Коуч» на Wa.me/79222220217 и получи 20% СКИДКУ! 🔥`,
@@ -197,6 +197,10 @@ const processTelegramMessage = createStep({
           },
           runtimeContext,
         });
+
+        if (confirmResult.message_id) {
+          messageIds.push(confirmResult.message_id);
+        }
 
         setApplication(chatId.toString(), {
           step: 999,
@@ -225,7 +229,7 @@ const processTelegramMessage = createStep({
 
       switch (callbackData) {
         case 'start_application':
-          await telegramEditMessageTool.execute({
+          const editResult = await telegramEditMessageTool.execute({
             context: {
               chat_id: chatId,
               message_id: messageId,
@@ -240,11 +244,18 @@ const processTelegramMessage = createStep({
             runtimeContext,
           });
 
+          const initialMessageIds = [];
+          if (editResult.message_id) {
+            initialMessageIds.push(editResult.message_id);
+          } else if (messageId) {
+            initialMessageIds.push(messageId);
+          }
+
           setApplication(chatId.toString(), { 
             step: 1, 
             answers: {}, 
             createdAt: new Date().toISOString(),
-            messageIds: [messageId],
+            messageIds: initialMessageIds,
           });
           break;
 

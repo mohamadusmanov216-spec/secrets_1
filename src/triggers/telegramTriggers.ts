@@ -188,12 +188,6 @@ export function registerTelegramTrigger({
                   userApp.answers[answerKeys[userApp.step - 1]] = messageText;
                   userApp.step++;
                   
-                  setApplication(chatId.toString(), {
-                    step: userApp.step,
-                    answers: userApp.answers,
-                    createdAt: userApp.createdAt,
-                  });
-                  
                   telegramSendMessageTool.execute({
                     context: {
                       chat_id: chatId,
@@ -207,6 +201,18 @@ export function registerTelegramTrigger({
                     },
                     mastra,
                     runtimeContext: {} as any,
+                  }).then((result) => {
+                    const messageIds = userApp.messageIds || [];
+                    if (result.message_id) {
+                      messageIds.push(result.message_id);
+                    }
+                    
+                    setApplication(chatId.toString(), {
+                      step: userApp.step,
+                      answers: userApp.answers,
+                      createdAt: userApp.createdAt,
+                      messageIds: messageIds,
+                    });
                   }).catch((err) => logger?.error("❌ [Telegram] Failed to send question:", err));
                   
                   logger?.info("✅ [Telegram] Fast-path question sent");
