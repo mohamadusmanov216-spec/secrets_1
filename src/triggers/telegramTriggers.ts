@@ -101,7 +101,7 @@ export function registerTelegramTrigger({
                   replyMarkup = {
                     inline_keyboard: [
                       [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
-                      [{ text: '📝 Оставить заявку', callback_data: 'start_application' }]
+                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
                     ]
                   };
                   break;
@@ -110,7 +110,7 @@ export function registerTelegramTrigger({
                   replyMarkup = {
                     inline_keyboard: [
                       [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
-                      [{ text: '📝 Оставить заявку', callback_data: 'start_application' }]
+                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
                     ]
                   };
                   break;
@@ -119,7 +119,8 @@ export function registerTelegramTrigger({
                   replyMarkup = {
                     inline_keyboard: [
                       [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
-                      [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }]
+                      [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
+                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
                     ]
                   };
                   break;
@@ -233,6 +234,31 @@ export function registerTelegramTrigger({
                 logger?.info("✅ [Telegram] All applications cleared");
                 return c.text("OK", 200);
               }
+            }
+            
+            // Fast path: Handle /start command
+            if (messageText === "/start") {
+              logger?.info("⚡ [Telegram] Fast-path /start command");
+              
+              telegramSendMessageTool.execute({
+                context: {
+                  chat_id: chatId,
+                  text: MAIN_MENU_TEXT,
+                  parse_mode: "Markdown",
+                  reply_markup: {
+                    inline_keyboard: [
+                      [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
+                      [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
+                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
+                    ]
+                  },
+                },
+                mastra,
+                runtimeContext: {} as any,
+              }).catch((err) => logger?.error("❌ [Telegram] Failed to send start message:", err));
+              
+              logger?.info("✅ [Telegram] Fast-path /start sent");
+              return c.text("OK", 200);
             }
             
             // Fast path: Handle application answers directly
