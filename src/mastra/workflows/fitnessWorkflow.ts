@@ -1,6 +1,7 @@
 import { createStep, createWorkflow } from "../inngest";
 import { z } from "zod";
 import { telegramSendMessageTool, telegramEditMessageTool, telegramAnswerCallbackQueryTool, telegramSendPhotoTool } from "../tools/telegramTool";
+import { getApplication, setApplication, deleteApplication, hasApplication } from "../../utils/applicationStorage";
 
 const ADMIN_ID = "1061591635";
 
@@ -33,8 +34,6 @@ const MAIN_MENU_TEXT = `💪 Сун хаъ хьо дик форме ва луъ�
 4️⃣ Фармакологих лаьцна
 
 Вай НОХЧИ къам г1арч аьл хилит луъш ар баькхан бу х1ар некъ 🙌🏼`;
-
-const userApplications = new Map();
 
 const processTelegramMessage = createStep({
   id: "process-telegram-message",
@@ -91,10 +90,14 @@ const processTelegramMessage = createStep({
       return { success: true, action: "start_sent" };
     }
 
-    if (userApplications.has(chatId.toString()) && messageText && !callbackData) {
+    if (hasApplication(chatId.toString()) && messageText && !callbackData) {
       logger?.info("📝 [FitnessBot] Processing application answer");
       
-      const userApp = userApplications.get(chatId.toString());
+      const userApp = getApplication(chatId.toString());
+      if (!userApp) {
+        logger?.error("❌ [FitnessBot] Application not found for chatId:", chatId);
+        return { success: false, action: "application_error" };
+      }
       const answer = messageText;
 
       const questions = [
@@ -110,6 +113,12 @@ const processTelegramMessage = createStep({
       if (userApp.step <= 5) {
         userApp.answers[answerKeys[userApp.step - 1]] = answer;
         userApp.step++;
+        
+        setApplication(chatId.toString(), {
+          step: userApp.step,
+          answers: userApp.answers,
+          createdAt: userApp.createdAt,
+        });
 
         await telegramSendMessageTool.execute({
           context: {
@@ -160,7 +169,7 @@ const processTelegramMessage = createStep({
           runtimeContext,
         });
 
-        userApplications.delete(chatId.toString());
+        deleteApplication(chatId.toString());
 
         await telegramSendMessageTool.execute({
           context: {
@@ -194,7 +203,11 @@ const processTelegramMessage = createStep({
 
       switch (callbackData) {
         case 'start_application':
-          userApplications.set(chatId.toString(), { step: 1, answers: {} });
+          setApplication(chatId.toString(), { 
+            step: 1, 
+            answers: {}, 
+            createdAt: new Date().toISOString() 
+          });
 
           await telegramEditMessageTool.execute({
             context: {
@@ -213,7 +226,7 @@ const processTelegramMessage = createStep({
           break;
 
         case 'cancel_application':
-          userApplications.delete(chatId.toString());
+          deleteApplication(chatId.toString());
           
           await telegramEditMessageTool.execute({
             context: {

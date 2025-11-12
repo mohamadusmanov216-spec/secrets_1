@@ -5,7 +5,10 @@
     "@mastra/loggers": "^0.10.19",
     "@mastra/mcp": "^0.14.2",
     "@mastra/pg": "^0.17.8",
+    "drizzle-kit": "^0.31.6",
+    "drizzle-orm": "^0.44.7",
     "inngest-cli": "^1.13.5",
-    "mastra": "^0.18.0"
+    "mastra": "^0.18.0",
+    "pg": "^8.16.3"
   }
 }
