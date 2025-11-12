@@ -111,7 +111,7 @@ const processTelegramMessage = createStep({
         `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 3/6:\n\nУ тебя есть заболевания, травмы, аллергии или перенесенные операции?\n\n*Если нет, напиши "Нет"*`,
         `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 4/6:\n\nУ тебя есть цели и задачи на тренировочный процесс?\n\n*Пример:* набор массы, скинуть вес, рельеф`,
         `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 5/6:\n\nПланируете ли использовать фармакологию, SARMS?\n\n*Да/Нет*`,
-        `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 6/6:\n\nИспользуете ли вы фармакологию или SARMS сейчас? Если да, то какие препараты и дозировки?\n\n*Если нет, напиши "Нет"*`
+        `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 6/6:\n\nЕсли да, то какие препараты и дозировки?\n\n*Если нет, напиши "Нет"*`
       ];
 
       const answerKeys = ['nameAge', 'heightWeight', 'health', 'goals', 'plansPharmacology', 'currentPharmacology'];
@@ -249,11 +249,12 @@ const processTelegramMessage = createStep({
           break;
 
         case 'clear_chat':
-          const userApp = getApplication(chatId.toString());
-          if (userApp && userApp.messageIds && userApp.messageIds.length > 0) {
-            logger?.info("🗑 [FitnessBot] Clearing chat messages", { count: userApp.messageIds.length });
+          const userAppData = getApplication(chatId.toString());
+          
+          if (userAppData && userAppData.messageIds && userAppData.messageIds.length > 0) {
+            logger?.info("🗑 [FitnessBot] Clearing chat messages", { count: userAppData.messageIds.length });
             
-            for (const msgId of userApp.messageIds) {
+            for (const msgId of userAppData.messageIds) {
               try {
                 await telegramDeleteMessageTool.execute({
                   context: {
@@ -270,6 +271,21 @@ const processTelegramMessage = createStep({
             deleteApplication(chatId.toString());
             logger?.info("✅ [FitnessBot] Chat cleared successfully");
           }
+          
+          await telegramEditMessageTool.execute({
+            context: {
+              chat_id: chatId,
+              message_id: messageId,
+              text: `✅ *ЧАТ ОЧИЩЕН!*\n\nВсе сообщения анкеты удалены. Готовы начать заново?`,
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+                ]
+              },
+            },
+            runtimeContext,
+          });
           break;
 
         case 'cancel_application':
