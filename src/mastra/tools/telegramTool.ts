@@ -204,3 +204,67 @@ export const telegramAnswerCallbackQueryTool = createTool({
     }
   },
 });
+
+export const telegramSendPhotoTool = createTool({
+  id: "telegram-send-photo",
+  description: "Send a photo to a Telegram chat with optional caption and inline keyboard",
+  
+  inputSchema: z.object({
+    chat_id: z.union([z.string(), z.number()]).describe("The chat ID to send the photo to"),
+    photo: z.string().describe("Photo file_id or URL"),
+    caption: z.string().optional().describe("Photo caption"),
+    parse_mode: z.enum(["Markdown", "HTML", "MarkdownV2"]).optional().describe("Parse mode for the caption"),
+    reply_markup: inlineKeyboardMarkupSchema.optional().describe("Inline keyboard markup"),
+  }),
+
+  outputSchema: z.object({
+    success: z.boolean(),
+    message_id: z.number().optional(),
+    file_id: z.string().optional().describe("File ID of the sent photo for reuse"),
+    error: z.string().optional(),
+  }),
+
+  execute: async ({ context, mastra }) => {
+    const logger = mastra?.getLogger();
+    logger?.info("🔧 [telegramSendPhotoTool] Sending photo to chat:", { chat_id: context.chat_id });
+
+    try {
+      const response = await fetch(`${TELEGRAM_API_URL}/sendPhoto`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: context.chat_id,
+          photo: context.photo,
+          caption: context.caption,
+          parse_mode: context.parse_mode || "Markdown",
+          reply_markup: context.reply_markup,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        logger?.error("❌ [telegramSendPhotoTool] Failed to send photo:", data);
+        return {
+          success: false,
+          error: data.description || "Failed to send photo",
+        };
+      }
+
+      logger?.info("✅ [telegramSendPhotoTool] Photo sent successfully");
+      return {
+        success: true,
+        message_id: data.result?.message_id,
+        file_id: data.result?.photo?.[0]?.file_id,
+      };
+    } catch (error) {
+      logger?.error("❌ [telegramSendPhotoTool] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});

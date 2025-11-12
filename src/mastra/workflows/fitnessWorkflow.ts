@@ -1,6 +1,6 @@
 import { createStep, createWorkflow } from "../inngest";
 import { z } from "zod";
-import { telegramSendMessageTool, telegramEditMessageTool, telegramAnswerCallbackQueryTool } from "../tools/telegramTool";
+import { telegramSendMessageTool, telegramEditMessageTool, telegramAnswerCallbackQueryTool, telegramSendPhotoTool } from "../tools/telegramTool";
 
 const ADMIN_ID = "1061591635";
 
@@ -66,12 +66,20 @@ const processTelegramMessage = createStep({
     const { chatId, messageText, callbackData, messageId, userName, callbackQueryId } = inputData;
 
     if (messageText === "/start") {
-      logger?.info("📤 [FitnessBot] Sending welcome message");
+      logger?.info("📤 [FitnessBot] Sending welcome message with photo");
       
-      await telegramSendMessageTool.execute({
+      // Get the photo URL from the current domain
+      const photoUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}/assets/main_menu_photo.jpg`
+        : `http://0.0.0.0:5000/assets/main_menu_photo.jpg`;
+      
+      logger?.info("📷 [FitnessBot] Using photo URL:", { photoUrl });
+      
+      await telegramSendPhotoTool.execute({
         context: {
           chat_id: chatId,
-          text: MAIN_MENU_TEXT,
+          photo: photoUrl,
+          caption: MAIN_MENU_TEXT,
           parse_mode: "Markdown",
           reply_markup: {
             inline_keyboard: [

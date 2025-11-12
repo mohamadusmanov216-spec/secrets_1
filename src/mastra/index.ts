@@ -114,6 +114,36 @@ export const mastra = new Mastra({
     ],
     apiRoutes: [
       // ======================================================================
+      // Static Assets Endpoint
+      // ======================================================================
+      {
+        path: "/assets/main_menu_photo.jpg",
+        method: "GET",
+        createHandler: async ({ mastra }) => {
+          return async (c) => {
+            const logger = mastra.getLogger();
+            logger?.debug("[Static Asset] Serving main menu photo");
+            
+            try {
+              const fs = await import('fs/promises');
+              const path = await import('path');
+              
+              const photoPath = path.join(process.cwd(), 'attached_assets', 'main_menu_photo.jpg');
+              const photoBuffer = await fs.readFile(photoPath);
+              
+              return c.body(photoBuffer, 200, {
+                'Content-Type': 'image/jpeg',
+                'Cache-Control': 'public, max-age=31536000',
+              });
+            } catch (error) {
+              logger?.error("[Static Asset] Error serving photo:", error);
+              return c.text("Photo not found", 404);
+            }
+          };
+        },
+      },
+
+      // ======================================================================
       // Inngest Integration Endpoint
       // ======================================================================
       {
