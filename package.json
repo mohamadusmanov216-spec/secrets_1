@@ -1,14 +1,28 @@
 {
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "dev": "ts-node --esm src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@mastra/core": "^0.24.0",
-    "@mastra/inngest": "^0.18.4",
+    "@mastra/imgest": "^0.18.4",
     "@mastra/loggers": "^0.10.19",
     "@mastra/mcp": "^0.14.2",
     "@mastra/pg": "^0.17.8",
     "drizzle-kit": "^0.31.6",
     "drizzle-orm": "^0.44.7",
-    "inngest-cli": "^1.13.5",
+    "imgest-cli": "^1.13.5",
     "mastra": "^0.18.0",
     "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
   }
 }
