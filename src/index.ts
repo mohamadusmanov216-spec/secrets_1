@@ -1,11 +1,3 @@
-import { Telegraf } from 'telegraf';
+import { startBot } from './triggers/telegramTriggers.js';
 
-const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
-
-bot.start((ctx) => {
-  ctx.reply('🎉 Бот работает!');
-});
-
-bot.launch().then(() => {
-  console.log('✅ Бот запущен!');
-});
+startBot().catch(console.error);
