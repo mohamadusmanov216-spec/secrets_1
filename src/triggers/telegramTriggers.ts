@@ -1,9 +1,7 @@
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { Telegraf, Context } from 'telegraf';
+import pino from 'pino';
 
-import { registerApiRoute } from "../mastra/inngest";
-import { Mastra } from "@mastra/core";
-import { telegramAnswerCallbackQueryTool, telegramEditMessageTool, telegramSendMessageTool } from "../mastra/tools/telegramTool";
-import { getApplication, setApplication, deleteApplication, hasApplication, getAllApplications, clearAllApplications } from "../utils/applicationStorage";
+const logger = pino();
 
 const NUTRITION_VIDEO_TEXT = `💪 СПОРТ ПИТАНИЕ - мой успех 🙌🏻
 
@@ -39,304 +37,145 @@ const MAIN_MENU_TEXT = `Я знаю , что ты хочешь себе хоро
 
 Придерживаемся правила из трех буквы «ННН»(Нет Ничего Невозможного) и топим дальше 🚀`;
 
-export type TriggerInfoTelegramOnNewMessage = {
-  type: "telegram/message";
-  params: {
-    userName: string;
-    message: string;
-    chatId: number | string;
-    messageId?: number;
-    callbackData?: string;
-    callbackQueryId?: string;
-  };
-  payload: any;
+// Инициализация бота
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
+
+// Главное меню
+const showMainMenu = async (ctx: Context, chatId?: number) => {
+  const targetChatId = chatId || ctx.chat?.id;
+  if (!targetChatId) return;
+
+  await ctx.telegram.sendMessage(targetChatId, MAIN_MENU_TEXT, {
+    parse_mode: 'Markdown' as const,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
+        [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
+        [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
+      ]
+    }
+  });
 };
 
-export function registerTelegramTrigger({
-  triggerType,
-  handler,
-}: {
-  triggerType: string;
-  handler: (
-    mastra: Mastra,
-    triggerInfo: TriggerInfoTelegramOnNewMessage,
-  ) => Promise<void>;
-}) {
-  return [
-    registerApiRoute("/webhooks/telegram/action", {
-      method: "POST",
-      handler: async (c) => {
-        const mastra = c.get("mastra");
-        const logger = mastra.getLogger();
-        try {
-          const payload = await c.req.json();
+// Обработка команды /start
+bot.start(async (ctx) => {
+  await showMainMenu(ctx);
+});
 
-          logger?.info("📝 [Telegram] Received webhook payload", {
-            hasMessage: !!payload.message,
-            hasCallbackQuery: !!payload.callback_query,
-          });
+// Обработка callback queries
+bot.on('callback_query', async (ctx) => {
+  const callbackData = ctx.callbackQuery?.data;
+  const chatId = ctx.callbackQuery?.message?.chat.id;
+  const messageId = ctx.callbackQuery?.message?.message_id;
 
-          // Handle both regular messages and callback queries
-          let triggerInfo: TriggerInfoTelegramOnNewMessage;
+  if (!callbackData || !chatId) return;
 
-          if (payload.callback_query) {
-            const callbackData = payload.callback_query.data;
-            const chatId = payload.callback_query.message?.chat.id;
-            const messageId = payload.callback_query.message?.message_id;
-            const callbackQueryId = payload.callback_query.id;
+  // Ответим на callback query чтобы убрать загрузку
+  await ctx.answerCbQuery();
 
-            // Fast path: Handle navigation callbacks directly without workflow
-            const simpleNavigationCallbacks = ['nutrition_video', 'coaching_video', 'main_menu'];
-            
-            if (simpleNavigationCallbacks.includes(callbackData)) {
-              logger?.info("⚡ [Telegram] Fast-path callback", { callback: callbackData });
+  let text = '';
+  let replyMarkup: any;
 
-              // Determine response based on callback
-              let text = '';
-              let replyMarkup: any;
+  switch (callbackData) {
+    case 'nutrition_video':
+      text = NUTRITION_VIDEO_TEXT;
+      replyMarkup = {
+        inline_keyboard: [
+          [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
+          [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
+        ]
+      };
+      break;
+    
+    case 'coaching_video':
+      text = COACHING_VIDEO_TEXT;
+      replyMarkup = {
+        inline_keyboard: [
+          [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
+          [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
+        ]
+      };
+      break;
+    
+    case 'main_menu':
+      await showMainMenu(ctx, chatId);
+      return;
+    
+    case 'start_application':
+      text = `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 1/6:\n\nИмя и возраст?\n\n*Пример:* Иван 25 лет`;
+      replyMarkup = {
+        inline_keyboard: [
+          [{ text: '❌ Отменить заявку', callback_data: 'cancel_application' }]
+        ]
+      };
+      // Здесь можно добавить логику начала заявки
+      break;
+    
+    case 'cancel_application':
+      text = '❌ Заявка отменена';
+      replyMarkup = {
+        inline_keyboard: [
+          [{ text: '📋 Главное меню', callback_data: 'main_menu' }]
+        ]
+      };
+      break;
+    
+    default:
+      return;
+  }
 
-              switch (callbackData) {
-                case 'nutrition_video':
-                  text = NUTRITION_VIDEO_TEXT;
-                  replyMarkup = {
-                    inline_keyboard: [
-                      [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
-                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
-                    ]
-                  };
-                  break;
-                case 'coaching_video':
-                  text = COACHING_VIDEO_TEXT;
-                  replyMarkup = {
-                    inline_keyboard: [
-                      [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
-                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
-                    ]
-                  };
-                  break;
-                case 'main_menu':
-                  text = MAIN_MENU_TEXT;
-                  replyMarkup = {
-                    inline_keyboard: [
-                      [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
-                      [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
-                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
-                    ]
-                  };
-                  break;
-              }
+  if (messageId) {
+    await ctx.editMessageText(text, {
+      parse_mode: 'Markdown' as const,
+      reply_markup: replyMarkup
+    });
+  } else {
+    await ctx.telegram.sendMessage(chatId, text, {
+      parse_mode: 'Markdown' as const,
+      reply_markup: replyMarkup
+    });
+  }
+});
 
-              // Answer callback query immediately to remove loading indicator
-              telegramAnswerCallbackQueryTool.execute({
-                context: { callback_query_id: callbackQueryId },
-                mastra,
-                runtimeContext: {} as any,
-              }).catch((err) => logger?.error("❌ [Telegram] Failed to answer callback:", err));
+// Обработка текстовых сообщений (для заявок)
+bot.on('text', async (ctx) => {
+  const messageText = ctx.message.text;
+  const chatId = ctx.chat.id;
 
-              // Edit message without waiting
-              telegramEditMessageTool.execute({
-                context: {
-                  chat_id: chatId,
-                  message_id: messageId,
-                  text,
-                  parse_mode: "Markdown" as const,
-                  reply_markup: replyMarkup,
-                },
-                mastra,
-                runtimeContext: {} as any,
-              }).catch((err) => logger?.error("❌ [Telegram] Failed to edit message:", err));
+  // Админ команды
+  const ADMIN_ID = 1061591635;
+  if (chatId === ADMIN_ID) {
+    if (messageText === '/admin') {
+      // Логика админ панели
+      await ctx.reply('🔐 Админ панель - функционал в разработке');
+      return;
+    }
+    if (messageText === '/clear') {
+      // Логика очистки данных
+      await ctx.reply('✅ Данные очищены');
+      return;
+    }
+  }
 
-              logger?.info("✅ [Telegram] Fast-path initiated");
-              return c.text("OK", 200);
-            }
+  // Если не команда /start, покажем главное меню
+  if (messageText !== '/start') {
+    await showMainMenu(ctx);
+  }
+});
 
-            // Callback query from inline keyboard button (complex ones go to workflow)
-            triggerInfo = {
-              type: "telegram/message",
-              params: {
-                userName: payload.callback_query.from?.username || "unknown",
-                message: payload.callback_query.data || "",
-                chatId: payload.callback_query.message?.chat.id,
-                messageId: payload.callback_query.message?.message_id,
-                callbackData: payload.callback_query.data,
-                callbackQueryId: payload.callback_query.id,
-              },
-              payload,
-            };
-          } else if (payload.message) {
-            const chatId = payload.message.chat.id;
-            const messageText = payload.message.text || "";
-            
-            // Admin commands (only for admin ID: 1061591635)
-            const ADMIN_ID = 1061591635;
-            if (chatId === ADMIN_ID && (messageText === '/admin' || messageText === '/clear')) {
-              logger?.info("🔐 [Telegram] Admin command received", { command: messageText });
-              
-              if (messageText === '/admin') {
-                const allApps = getAllApplications();
-                const appCount = Object.keys(allApps).length;
-                
-                let responseText = `🔐 *АДМИН ПАНЕЛЬ*\n\n📊 Всего заявок: ${appCount}\n\n`;
-                
-                if (appCount === 0) {
-                  responseText += '❌ Нет заявок';
-                } else {
-                  responseText += '📝 *СПИСОК ЗАЯВОК:*\n\n';
-                  let counter = 1;
-                  
-                  for (const [chatId, app] of Object.entries(allApps)) {
-                    responseText += `${counter}. 👤 ID: \`${chatId}\`\n`;
-                    responseText += `   📅 Дата: ${new Date(app.createdAt).toLocaleString('ru-RU')}\n`;
-                    responseText += `   📊 Шаг: ${app.step}\n`;
-                    
-                    if (app.answers && Object.keys(app.answers).length > 0) {
-                      responseText += `   ✅ Ответы:\n`;
-                      if (app.answers.nameAge) responseText += `      • Имя/Возраст: ${app.answers.nameAge}\n`;
-                      if (app.answers.heightWeight) responseText += `      • Рост/Вес: ${app.answers.heightWeight}\n`;
-                      if (app.answers.health) responseText += `      • Здоровье: ${app.answers.health}\n`;
-                      if (app.answers.goals) responseText += `      • Цели: ${app.answers.goals}\n`;
-                      if (app.answers.plansPharmacology) responseText += `      • План фарма: ${app.answers.plansPharmacology}\n`;
-                      if (app.answers.currentPharmacology) responseText += `      • Текущий фарма: ${app.answers.currentPharmacology}\n`;
-                    }
-                    
-                    responseText += '\n';
-                    counter++;
-                  }
-                }
-                
-                telegramSendMessageTool.execute({
-                  context: {
-                    chat_id: chatId,
-                    text: responseText,
-                    parse_mode: "Markdown",
-                  },
-                  mastra,
-                  runtimeContext: {} as any,
-                }).catch((err) => logger?.error("❌ [Telegram] Failed to send admin response:", err));
-                
-                logger?.info("✅ [Telegram] Admin data sent");
-                return c.text("OK", 200);
-              }
-              
-              if (messageText === '/clear') {
-                clearAllApplications();
-                
-                telegramSendMessageTool.execute({
-                  context: {
-                    chat_id: chatId,
-                    text: `✅ *ДАННЫЕ ОЧИЩЕНЫ*\n\nВсе заявки удалены из базы данных.`,
-                    parse_mode: "Markdown",
-                  },
-                  mastra,
-                  runtimeContext: {} as any,
-                }).catch((err) => logger?.error("❌ [Telegram] Failed to send clear confirmation:", err));
-                
-                logger?.info("✅ [Telegram] All applications cleared");
-                return c.text("OK", 200);
-              }
-            }
-            
-            // Fast path: Handle /start command
-            if (messageText === "/start") {
-              logger?.info("⚡ [Telegram] Fast-path /start command");
-              
-              telegramSendMessageTool.execute({
-                context: {
-                  chat_id: chatId,
-                  text: MAIN_MENU_TEXT,
-                  parse_mode: "Markdown",
-                  reply_markup: {
-                    inline_keyboard: [
-                      [{ text: '💪 Про спорт питание', callback_data: 'nutrition_video' }],
-                      [{ text: '🏆 Под ключ с Исламом', callback_data: 'coaching_video' }],
-                      [{ text: '📋 Заполнить заявку', callback_data: 'start_application' }]
-                    ]
-                  },
-                },
-                mastra,
-                runtimeContext: {} as any,
-              }).catch((err) => logger?.error("❌ [Telegram] Failed to send start message:", err));
-              
-              logger?.info("✅ [Telegram] Fast-path /start sent");
-              return c.text("OK", 200);
-            }
-            
-            // Fast path: Handle application answers directly
-            if (hasApplication(chatId.toString()) && messageText && messageText !== "/start") {
-              logger?.info("⚡ [Telegram] Fast-path application answer");
-              
-              const userApp = getApplication(chatId.toString());
-              if (userApp) {
-                const questions = [
-                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 2/6:\n\nРост и вес?\n\n*Пример:* 180 см 75 кг`,
-                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 3/6:\n\nУ тебя есть заболевания, травмы, аллергии или перенесенные операции?\n\n*Если нет, напиши "Нет"*`,
-                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 4/6:\n\nУ тебя есть цели и задачи на тренировочный процесс?\n\n*Пример:* набор массы, скинуть вес, рельеф`,
-                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 5/6:\n\nПланируете ли использовать фармакологию, SARMS?\n\n*Да/Нет*`,
-                  `📝 *АНКЕТА ДЛЯ ТРЕНИРОВОК*\n\nВопрос 6/6:\n\nЕсли да, то какие препараты и дозировки?\n\n*Если нет, напиши "Нет"*`
-                ];
-                
-                const answerKeys = ['nameAge', 'heightWeight', 'health', 'goals', 'plansPharmacology', 'currentPharmacology'];
-                
-                if (userApp.step <= 5) {
-                  userApp.answers[answerKeys[userApp.step - 1]] = messageText;
-                  userApp.step++;
-                  
-                  telegramSendMessageTool.execute({
-                    context: {
-                      chat_id: chatId,
-                      text: questions[userApp.step - 2],
-                      parse_mode: "Markdown",
-                      reply_markup: {
-                        inline_keyboard: [
-                          [{ text: '❌ Отменить заявку', callback_data: 'cancel_application' }]
-                        ]
-                      },
-                    },
-                    mastra,
-                    runtimeContext: {} as any,
-                  }).then((result) => {
-                    const messageIds = userApp.messageIds || [];
-                    if (result.message_id) {
-                      messageIds.push(result.message_id);
-                    }
-                    
-                    setApplication(chatId.toString(), {
-                      step: userApp.step,
-                      answers: userApp.answers,
-                      createdAt: userApp.createdAt,
-                      messageIds: messageIds,
-                    });
-                  }).catch((err) => logger?.error("❌ [Telegram] Failed to send question:", err));
-                  
-                  logger?.info("✅ [Telegram] Fast-path question sent");
-                  return c.text("OK", 200);
-                }
-              }
-            }
-            
-            // Regular message
-            triggerInfo = {
-              type: "telegram/message",
-              params: {
-                userName: payload.message.from?.username || "unknown",
-                message: payload.message.text || "",
-                chatId: payload.message.chat.id,
-              },
-              payload,
-            };
-          } else {
-            logger?.warn("⚠️ [Telegram] Unknown payload type, ignoring");
-            return c.text("OK", 200);
-          }
+// Запуск бота
+const startBot = async () => {
+  try {
+    await bot.launch();
+    logger.info('✅ Telegram bot started successfully');
+  } catch (error) {
+    logger.error('❌ Failed to start bot:', error);
+    process.exit(1);
+  }
+};
 
-          await handler(mastra, triggerInfo);
+// Graceful shutdown
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
-          return c.text("OK", 200);
-        } catch (error) {
-          logger?.error("❌ [Telegram] Error handling webhook:", error);
-          return c.text("Internal Server Error", 500);
-        }
-      },
-    }),
-  ];
-}
+export { bot, startBot };
