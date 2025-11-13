@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "build": "tsc",
-    "dev": "ts-node --esm src/index.ts", 
+    "dev": "ts-node --esm src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -18,7 +18,9 @@
     "pg": "^8.16.3",
     "inngest": "^3.0.0",
     "@slack/web-api": "^7.0.0",
-    "@inngest/realtime": "^1.0.0"
+    "pino": "^8.0.0",
+    "zod": "^3.22.0",
+    "hono": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
