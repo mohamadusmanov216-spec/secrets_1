@@ -63,13 +63,14 @@ bot.start(async (ctx) => {
 });
 
 // Обработка callback queries
+// Обработка callback queries
 bot.on('callback_query', async (ctx) => {
-  const callbackData = ctx.callbackQuery?.data;
-  const chatId = ctx.callbackQuery?.message?.chat.id;
-  const messageId = ctx.callbackQuery?.message?.message_id;
+  const callbackQuery = ctx.callbackQuery as { data?: string; message?: any };
+  const callbackData = callbackQuery?.data;
+  const chatId = callbackQuery?.message?.chat.id;
+  const messageId = callbackQuery?.message?.message_id;
 
   if (!callbackData || !chatId) return;
-
   // Ответим на callback query чтобы убрать загрузку
   await ctx.answerCbQuery();
 
