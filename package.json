@@ -15,7 +15,10 @@
     "@mastra/pg": "^0.17.8",
     "drizzle-kit": "^0.31.6",
     "drizzle-orm": "^0.44.7",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "inngest": "^3.0.0",
+    "@slack/web-api": "^7.0.0",
+    "@inngest/realtime": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
