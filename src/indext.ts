@@ -1,22 +1,11 @@
-import { startBot } from './triggers/telegramTriggers.js';
+import { Telegraf } from 'telegraf';
 
-const startApp = async (): Promise<void> => {
-  try {
-    console.log('🚀 Starting Fitness Telegram Bot...');
-    
-    if (!process.env.TELEGRAM_BOT_TOKEN) {
-      throw new Error('TELEGRAM_BOT_TOKEN is required');
-    }
-    
-    await startBot();
-    
-    console.log('✅ Application started successfully');
-    
-  } catch (error) {
-    console.error('❌ Failed to start application:', error);
-    process.exit(1);
-  }
-};
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
 
-// Запускаем приложение
-startApp();
+bot.start((ctx) => {
+  ctx.reply('🎉 Бот работает!');
+});
+
+bot.launch().then(() => {
+  console.log('✅ Бот запущен!');
+});
