@@ -275,14 +275,12 @@ bot.on('text', async (ctx) => {
 // Запуск бота
 const startBot = async () => {
   try {
-    await bot.launch();
-    logger.info('✅ Telegram bot started successfully');
+    await bot.launch();  // ← ЭТУ СТРОКУ ЗАМЕНИ!
+    logger.info('✅ Бот запущен');
   } catch (error) {
-    logger.error('❌ Failed to start bot:', error);
-    process.exit(1);
+    logger.error('❌ Ошибка:', error);
   }
 };
-
 // Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
