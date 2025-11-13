@@ -10,14 +10,11 @@
   },
   "dependencies": {
     "@mastra/core": "^0.24.0",
-    "@mastra/imgest": "^0.18.4",
     "@mastra/loggers": "^0.10.19",
     "@mastra/mcp": "^0.14.2",
     "@mastra/pg": "^0.17.8",
     "drizzle-kit": "^0.31.6",
     "drizzle-orm": "^0.44.7",
-    "imgest-cli": "^1.13.5",
-    "mastra": "^0.18.0",
     "pg": "^8.16.3"
   },
   "devDependencies": {
